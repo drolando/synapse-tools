@@ -266,6 +266,10 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology):
     if timeout_server_ms is not None:
         listen_options.append('timeout server %dms' % timeout_server_ms)
 
+    balance = service_info.get('balance')
+    if balance is not None and balance in ('leastconn', 'roundrobin'):
+        listen_options.append('balance %s' % balance)
+
     discover_type = service_info.get('discover', 'region')
     location = get_current_location(discover_type)
 

@@ -45,7 +45,8 @@ def test_generate_configuration(mock_get_current_location):
                     },
                     'extra_healthcheck_headers': {
                         'X-Mode': 'ro'
-                    }
+                    },
+                    'balance': 'roundrobin',
                 }
             )
         ]
@@ -69,6 +70,7 @@ def test_generate_configuration(mock_get_current_location):
                     'retries 2',
                     'timeout connect 2000ms',
                     'timeout server 3000ms',
+                    'balance roundrobin',
                 ],
                 'frontend': [
                     'timeout client 3000ms',
