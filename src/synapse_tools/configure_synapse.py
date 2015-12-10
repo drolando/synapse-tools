@@ -267,6 +267,8 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology):
         listen_options.append('timeout server %dms' % timeout_server_ms)
 
     balance = service_info.get('balance')
+    # Validations are done in config post-receive so invalid config should 
+    # be ignored
     if balance is not None and balance in ('leastconn', 'roundrobin'):
         listen_options.append('balance %s' % balance)
 
