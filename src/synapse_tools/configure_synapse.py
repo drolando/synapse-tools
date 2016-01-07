@@ -11,6 +11,7 @@ import tempfile
 import yaml
 from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
+from yaml import CLoader
 
 
 SYNAPSE_TOOLS_CONFIG_PATH = '/etc/synapse/synapse-tools.conf.json'
@@ -48,7 +49,7 @@ HACHECK_PORT = 6666
 
 def get_zookeeper_topology():
     with open(ZOOKEEPER_TOPOLOGY_PATH) as fp:
-        zookeeper_topology = yaml.load(fp)
+        zookeeper_topology = yaml.load(fp, Loader=CLoader)
     zookeeper_topology = [
         '%s:%d' % (entry[0], entry[1]) for entry in zookeeper_topology]
     return zookeeper_topology
