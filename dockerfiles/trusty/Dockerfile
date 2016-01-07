@@ -10,7 +10,7 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 88ADA4A042F8DD13 &&
 RUN apt-get update && apt-get -y install \
 	debhelper \
 	dpkg-dev \
-	libyaml-0-2 \
+	libyaml-dev \
 	libcurl4-openssl-dev \
 	python-dev \
 	python-tox \
