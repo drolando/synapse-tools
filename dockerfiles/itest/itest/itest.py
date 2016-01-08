@@ -77,9 +77,6 @@ SYNAPSE_ROOT_DIR = '/var/run/synapse'
 
 @pytest.yield_fixture(scope="module")
 def setup():
-    # Install synapse-tools
-    subprocess.check_call('dpkg -i /work/dist/synapse-tools_*.deb', shell=True)
-
     os.makedirs(SYNAPSE_ROOT_DIR)
 
     zk = kazoo.client.KazooClient(hosts=ZOOKEEPER_CONNECT_STRING)
