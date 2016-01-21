@@ -1,3 +1,9 @@
+synapse-tools (0.9.3) lucid; urgency=low
+
+  * Add balance option
+
+ -- Matt Carroll <mattc@yelp.com>  Thu, 21 Jan 2016 07:55:30 -0800
+
 synapse-tools (0.9.2) lucid; urgency=low
 
   * Fix pyyaml build to use c libyaml when possible
