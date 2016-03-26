@@ -1,0 +1,18 @@
+branch:
+  only:
+    - master
+language: python
+sudo: required
+services:
+  - docker
+install: pip install tox
+script: make itest_trusty
+deploy:
+  - provider: bintray
+    file: "bintray.json"
+    user: yelptravis
+    key:
+      secure: "F9DHZln0Zp1/A/ZvhXyn7ff55WAo8Df2NuS1/TZshXXbWpc5LXbxFrPHtoP5gBG+BuH7MnYzm4g0S1lECxbSs+fuiBE4C3nfnk8hXfl31o451WQQnjOhtJ0BHXoA2LqTd9gFFZETTGz6IGioP7sc0LrzJ7XR2iMaPSBGraZTvUQM5hodKIQ3Nfv2qbSbPyV4zAe54ukO4rn4lxqgTeDKjcbpU797QWokuePfvqa2wKShrtsWqW/mJ3vDKB3aimGPXC8TRXp1tEdF0jJIfX4nLO3HEnOMQgwRGu1Dk2/BlQvL+k8ZUEt2iNhkkh/ZpBIFmWC/vhj40zEAk3uPs3JTavULvCHQ81/UMJjA+fBve9INp93kvjC1udJCMn2FNF7fVj8xeVcSq7XIFzk/Buqn40b9AaMX80iow+8hJ68vm/r6U8U/K19azgmKCQWDYYtCmLmuNRi6TTQvF7ToyfQxNrgq8MNp6akCA7L0lad0IWhm/haV5wvOpem5ozuRwZgf8Yh9aryLt3NngndqEw51RC4onqyw1ytEtqCh1UDrJgzRJZuJozz0s3Yv7OZc09w9i4aRji6Tzd2mrfpKrjBJzIUFOAist1W0wzNsJu1flxAjh6pYvYp6wYeMxU1zsz808/c4cTbUHpmJYONmgzn/+zLqQiAXDIX5Ye1KgEE1bsI="
+    on:
+      branch: master
+      repo: Yelp/synapse-tools
