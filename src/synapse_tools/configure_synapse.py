@@ -219,6 +219,8 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology):
 
     extra_headers = service_info.get('extra_headers', {})
     for header, value in extra_headers.iteritems():
+        backend_options.append('reqidel ^%s:.*' % (header))
+    for header, value in extra_headers.iteritems():
         backend_options.append('reqadd %s:\ %s' % (header, value))
 
     # Listen options

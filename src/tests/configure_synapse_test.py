@@ -82,6 +82,7 @@ def test_generate_configuration(mock_get_current_location):
                     'option httplog',
                 ],
                 'backend': [
+                    'reqidel ^X-Mode:.*',
                     'reqadd X-Mode:\ ro',
                 ],
                 'port': '1234',

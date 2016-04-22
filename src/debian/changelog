@@ -1,3 +1,10 @@
+synapse-tools (0.9.4) lucid; urgency=low
+
+  * When adding extra headers to requests delete
+    those headers on ingress. Internal ticket OPS-9501
+
+ -- Tomas Doran <tdoran@yelp.com>  Fri, 22 Apr 2016 00:49:48 -0700
+
 synapse-tools (0.9.3) lucid; urgency=low
 
   * Add balance option
