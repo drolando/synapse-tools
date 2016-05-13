@@ -14,41 +14,30 @@ from paasta_tools.marathon_tools import get_all_namespaces
 from yaml import CLoader
 
 
-SYNAPSE_TOOLS_CONFIG_PATH = '/etc/synapse/synapse-tools.conf.json'
+def get_config(synapse_tools_config_path):
+    with open(synapse_tools_config_path) as synapse_config:
+        return set_defaults(json.load(synapse_config))
 
 
-def get_config():
-    with open(SYNAPSE_TOOLS_CONFIG_PATH) as synapse_config:
-        return json.load(synapse_config)
-
-SYNAPSE_RESTART_COMMAND = ['service', 'synapse', 'restart']
-
-ZOOKEEPER_TOPOLOGY_PATH = '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'
-
-HAPROXY_PATH = '/usr/bin/haproxy-synapse'
-HAPROXY_CONFIG_PATH = '/var/run/synapse/haproxy.cfg'
-HAPROXY_SOCKET_FILE_PATH = '/var/run/synapse/haproxy.sock'
-HAPROXY_PID_FILE_PATH = '/var/run/synapse/haproxy.pid'
-FILE_OUTPUT_PATH = '/var/run/synapse/services'
-
-# Command used to start/reload haproxy.   Note that we touch the pid file first
-# in case it doesn't exist;  otherwise the reload will fail.
-HAPROXY_RELOAD_CMD = 'touch %s && PID=$(cat %s) && %s -f %s -p %s -sf $PID' % (
-    HAPROXY_PID_FILE_PATH, HAPROXY_PID_FILE_PATH, HAPROXY_PATH,
-    HAPROXY_CONFIG_PATH, HAPROXY_PID_FILE_PATH)
-# Hack to fix SRV-2141 and OPS-8144 until we can get a proper solution
-HAPROXY_RELOAD_WITH_SLEEP = '%s && sleep 0.010' % (HAPROXY_RELOAD_CMD)
-HAPROXY_PROTECT_CMD = "sudo /usr/bin/synapse_qdisc_tool protect bash -c '%s'"
-HAPROXY_PROTECTED_RELOAD_CMD = HAPROXY_PROTECT_CMD % HAPROXY_RELOAD_WITH_SLEEP
-
-# Global maximum number of connections.
-MAXIMUM_CONNECTIONS = 10000
-
-HACHECK_PORT = 6666
+def set_defaults(config):
+    config.setdefault('haproxy.defaults.inter', '10m')
+    config.setdefault('file_output_path', '/var/run/synapse/services')
+    config.setdefault('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock')
+    config.setdefault('haproxy_config_path', '/var/run/synapse/haproxy.cfg')
+    config.setdefault('maximum_connections', 10000)
+    config.setdefault('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock')
+    config.setdefault('synapse_restart_command', ['service', 'synapse', 'restart'])
+    config.setdefault('zookeeper_topology_path', '/nail/etc/zookeeper_discovery/infrastructure/local.yaml')
+    config.setdefault('haproxy_path', '/usr/bin/haproxy-synapse')
+    config.setdefault('haproxy_config_path', '/var/run/synapse/haproxy.cfg')
+    config.setdefault('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid')
+    config.setdefault('reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'""")
+    config.setdefault('hacheck_port', 6666)
+    return config
 
 
-def get_zookeeper_topology():
-    with open(ZOOKEEPER_TOPOLOGY_PATH) as fp:
+def get_zookeeper_topology(zookeeper_topology_path):
+    with open(zookeeper_topology_path) as fp:
         zookeeper_topology = yaml.load(fp, Loader=CLoader)
     zookeeper_topology = [
         '%s:%d' % (entry[0], entry[1]) for entry in zookeeper_topology]
@@ -56,28 +45,29 @@ def get_zookeeper_topology():
 
 
 def generate_base_config(synapse_tools_config):
-    haproxy_inter = synapse_tools_config.get('haproxy.defaults.inter', '10m')
+    synapse_tools_config = synapse_tools_config
+    haproxy_inter = synapse_tools_config['haproxy.defaults.inter']
     base_config = {
         # We'll fill this section in
         'services': {},
-        'file_output': {'output_directory': FILE_OUTPUT_PATH},
+        'file_output': {'output_directory': synapse_tools_config['file_output_path']},
         'haproxy': {
             'bind_address': synapse_tools_config['bind_addr'],
             'restart_interval': 60,
             'restart_jitter': 0.1,
             'state_file_path': '/var/run/synapse/state.json',
             'state_file_ttl': 30 * 60,
-            'reload_command': HAPROXY_PROTECTED_RELOAD_CMD,
-            'socket_file_path': HAPROXY_SOCKET_FILE_PATH,
-            'config_file_path': HAPROXY_CONFIG_PATH,
+            'reload_command': synapse_tools_config['reload_cmd_fmt'].format(**synapse_tools_config),
+            'socket_file_path': synapse_tools_config['haproxy_socket_file_path'],
+            'config_file_path': synapse_tools_config['haproxy_config_path'],
             'do_writes': True,
             'do_reloads': True,
             'do_socket': True,
 
             'global': [
                 'daemon',
-                'maxconn %d' % MAXIMUM_CONNECTIONS,
-                'stats socket %s level admin' % HAPROXY_SOCKET_FILE_PATH,
+                'maxconn %d' % synapse_tools_config['maximum_connections'],
+                'stats socket %s level admin' % synapse_tools_config['haproxy_socket_file_path'],
 
                 # Default of 16k is too small and causes HTTP 400 errors
                 'tune.bufsize 32768',
@@ -174,12 +164,14 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         synapse_config['services'][service_name] = haproxy_cfg_for_service(
             service_name,
             service_info,
-            zookeeper_topology)
+            zookeeper_topology,
+            synapse_tools_config,
+        )
 
     return synapse_config
 
 
-def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology):
+def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config):
     proxy_port = service_info['proxy_port']
 
     # If the service sets one timeout but not the other, set both
@@ -192,9 +184,9 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology):
     # Server options
     mode = service_info.get('mode', 'http')
     if mode == 'http':
-        server_options = 'check port %d observe layer7' % HACHECK_PORT
+        server_options = 'check port %d observe layer7' % synapse_tools_config['hacheck_port']
     else:
-        server_options = 'check port %d observe layer4' % HACHECK_PORT
+        server_options = 'check port %d observe layer4' % synapse_tools_config['hacheck_port']
 
     # Frontend options
     frontend_options = []
@@ -365,10 +357,10 @@ def get_my_grouping(grouping_type):
 
 
 def main():
-    my_config = get_config()
+    my_config = get_config(os.environ.get('SYNAPSE_TOOLS_CONFIG_PATH', '/etc/synapse/synapse-tools.conf.json'))
 
     new_synapse_config = generate_configuration(
-        my_config, get_zookeeper_topology(), get_all_namespaces()
+        my_config, get_zookeeper_topology(my_config['zookeeper_topology_path']), get_all_namespaces()
     )
 
     with tempfile.NamedTemporaryFile() as tmp_file:
@@ -388,4 +380,4 @@ def main():
         shutil.copy(new_synapse_config_path, my_config['config_file'])
 
         if should_restart:
-            subprocess.check_call(SYNAPSE_RESTART_COMMAND)
+            subprocess.check_call(my_config['synapse_restart_command'])

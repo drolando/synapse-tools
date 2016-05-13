@@ -22,14 +22,14 @@ def test_get_zookeeper_topology():
     with contextlib.nested(
             mock.patch('synapse_tools.configure_synapse.open', m, create=True),
             mock.patch('yaml.load', return_value=[['foo', 42]])):
-        zk_topology = configure_synapse.get_zookeeper_topology()
+        zk_topology = configure_synapse.get_zookeeper_topology('/path/to/fake/file')
     assert zk_topology == ['foo:42']
-    m.assert_called_with('/nail/etc/zookeeper_discovery/infrastructure/local.yaml')
+    m.assert_called_with('/path/to/fake/file')
 
 
 def test_generate_configuration(mock_get_current_location):
     actual_configuration = configure_synapse.generate_configuration(
-        synapse_tools_config={'bind_addr': '0.0.0.0'},
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
         zookeeper_topology=['1.2.3.4', '2.3.4.5'],
         services=[
             (
@@ -53,7 +53,7 @@ def test_generate_configuration(mock_get_current_location):
     )
 
     expected_configuration = configure_synapse.generate_base_config(
-        synapse_tools_config={'bind_addr': '0.0.0.0'}
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
     )
     expected_configuration['services'] = {
         'test_service': {
@@ -96,12 +96,12 @@ def test_generate_configuration(mock_get_current_location):
 
 def test_generate_configuration_empty():
     actual_configuration = configure_synapse.generate_configuration(
-        synapse_tools_config={'bind_addr': '0.0.0.0'},
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
         zookeeper_topology=['1.2.3.4', '2.3.4.5'],
         services=[]
     )
     expected_configuration = configure_synapse.generate_base_config(
-        synapse_tools_config={'bind_addr': '0.0.0.0'}
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
     )
     assert actual_configuration == expected_configuration
 
@@ -117,7 +117,12 @@ def setup_mocks_for_main():
             mock.patch('synapse_tools.configure_synapse.get_zookeeper_topology'),
             mock.patch('synapse_tools.configure_synapse.get_all_namespaces'),
             mock.patch('synapse_tools.configure_synapse.generate_configuration'),
-            mock.patch('synapse_tools.configure_synapse.get_config', return_value={'bind_addr': '0.0.0.0', 'config_file': '/etc/synapse/synapse.conf.json'}),
+            mock.patch(
+                'synapse_tools.configure_synapse.get_config',
+                return_value=configure_synapse.set_defaults(
+                    {'bind_addr': '0.0.0.0', 'config_file': '/etc/synapse/synapse.conf.json'}
+                ),
+            ),
             mock.patch('tempfile.NamedTemporaryFile', return_value=mock_tmp_file),
             mock.patch('synapse_tools.configure_synapse.open', create=True),
             mock.patch('json.dump'),
@@ -160,7 +165,7 @@ def test_chaos_delay(mock_get_current_location):
     with mock.patch.object(configure_synapse, 'get_my_grouping') as grouping_mock:
         grouping_mock.return_value = 'my_ecosystem'
         actual_configuration = configure_synapse.generate_configuration(
-            synapse_tools_config={'bind_addr': '0.0.0.0'},
+            synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
             zookeeper_topology=['1.2.3.4'],
             services=[
                 (
@@ -182,7 +187,7 @@ def test_chaos_drop(mock_get_current_location):
     with mock.patch.object(configure_synapse, 'get_my_grouping') as grouping_mock:
         grouping_mock.return_value = 'my_ecosystem'
         actual_configuration = configure_synapse.generate_configuration(
-            synapse_tools_config={'bind_addr': '0.0.0.0'},
+            synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
             zookeeper_topology=['1.2.3.4'],
             services=[
                 (
@@ -203,7 +208,7 @@ def test_chaos_error_503(mock_get_current_location):
     with mock.patch.object(configure_synapse, 'get_my_grouping') as grouping_mock:
         grouping_mock.return_value = 'my_ecosystem'
         actual_configuration = configure_synapse.generate_configuration(
-            synapse_tools_config={'bind_addr': '0.0.0.0'},
+            synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
             zookeeper_topology=['1.2.3.4'],
             services=[
                 (
