@@ -1,3 +1,9 @@
+synapse-tools (0.10.0) lucid; urgency=low
+
+  * Make most hard-coded values configurable via /etc/synapse/synapse-tools.conf.json / $SYNAPSE_TOOLS_CONFIG_PATH
+
+ -- Evan Krall <krall@yelp.com>  Tue, 17 May 2016 15:31:38 -0700
+
 synapse-tools (0.9.4) lucid; urgency=low
 
   * When adding extra headers to requests delete
@@ -62,13 +68,13 @@ synapse-tools (0.8.12) lucid; urgency=low
 
 synapse-tools (0.8.11) lucid; urgency=low
 
-  * Bump environment_tools to the latest version 
+  * Bump environment_tools to the latest version
 
  -- Matt Carroll <mattc@yelp.com>  Tue, 1 Sep 2015 11:19:00 -0700
 
 synapse-tools (0.8.10) lucid; urgency=low
 
-  * Bump environment_tools to the latest version 
+  * Bump environment_tools to the latest version
 
  -- Tomas Doran <tdoran@yelp.com>  Thu, 20 Aug 2015 08:12:16 -0700
 
