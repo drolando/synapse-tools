@@ -1,3 +1,9 @@
+synapse-tools (0.10.1) lucid; urgency=low
+
+  * Make stats port configurable as well.
+
+ -- Evan Krall <krall@yelp.com>  Tue, 17 May 2016 20:47:09 -0700
+
 synapse-tools (0.10.0) lucid; urgency=low
 
   * Make most hard-coded values configurable via /etc/synapse/synapse-tools.conf.json / $SYNAPSE_TOOLS_CONFIG_PATH
