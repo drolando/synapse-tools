@@ -33,6 +33,7 @@ def set_defaults(config):
     config.setdefault('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid')
     config.setdefault('reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'""")
     config.setdefault('hacheck_port', 6666)
+    config.setdefault('stats_port', 3212)
     return config
 
 
@@ -141,7 +142,7 @@ def generate_base_config(synapse_tools_config):
 
             'extra_sections': {
                 'listen stats': [
-                    'bind :3212',
+                    'bind :%d' % synapse_tools_config['stats_port'],
                     'mode http',
                     'stats enable',
                     'stats uri /',

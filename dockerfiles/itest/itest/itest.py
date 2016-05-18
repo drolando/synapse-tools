@@ -210,6 +210,7 @@ def test_tcp_synapse_service_config(setup):
 
     assert expected_service_entry == actual_service_entry
 
+
 def test_hacheck(setup):
     for name, data in SERVICES.iteritems():
         # Just test our HTTP service
@@ -234,7 +235,7 @@ def test_hacheck(setup):
 
 
 def test_synapse_haproxy_stats_page(setup):
-    haproxy_stats_uri = 'http://localhost:3212/;csv'
+    haproxy_stats_uri = 'http://localhost:32123/;csv'
 
     with contextlib.closing(
             urllib2.urlopen(haproxy_stats_uri, timeout=SOCKET_TIMEOUT)) as haproxy_stats:
