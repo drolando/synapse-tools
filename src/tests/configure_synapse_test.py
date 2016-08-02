@@ -221,3 +221,21 @@ def test_chaos_error_503(mock_get_current_location):
             ]
         )
         assert actual_configuration['services']['test_service']['discovery']['method'] == 'base'
+
+
+def test_bare_backend(mock_get_current_location):
+    with mock.patch.object(configure_synapse, 'get_my_grouping') as grouping_mock:
+        grouping_mock.return_value = 'my_ecosystem'
+        actual_configuration = configure_synapse.generate_configuration(
+            synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
+            zookeeper_topology=['1.2.3.4'],
+            services=[
+                (
+                    'test_service', {}
+                )
+            ]
+        )
+        grouping_mock.assert_called_once_with('ecosystem')
+
+    haproxy_config = actual_configuration['services']['test_service']['haproxy']
+    assert set(haproxy_config.keys()) == set(('server_options', 'backend'))

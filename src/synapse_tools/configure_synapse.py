@@ -289,13 +289,21 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, syna
         'use_previous_backends': False,
         'discovery': discovery,
         'haproxy': {
-            'port': '%d' % proxy_port,
             'server_options': server_options,
-            'frontend': frontend_options,
-            'listen': listen_options,
             'backend': backend_options
         }
     }
+
+    # If there is a valid proxy port, generate frontend, listen, and port
+    # sections.
+    # If there is an invalid port use that to signal that Synapse should
+    # generate a "bare" backends (no frontends),
+    if proxy_port < 0 or proxy_port > 65535:
+        service['haproxy'].update({
+            'port': '%d' % proxy_port,
+            'frontend': frontend_options,
+            'listen': listen_options,
+        })
 
     return service
 
