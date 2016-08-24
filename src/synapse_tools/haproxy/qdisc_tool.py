@@ -105,6 +105,7 @@ def parse_options():
         'Setup QoS queueing disciplines for haproxy'
     ))
     parser.add_argument('--verbose', '-v', action='store_true')
+    parser.add_argument('--source', '-s', action='store', default='169.254.255.254')
     subparsers = parser.add_subparsers()
 
     stat_parser = subparsers.add_parser(
@@ -156,6 +157,7 @@ def setup_logging(args):
 
 def main():
     args = parse_options()
+    SOURCE_IP = args.source
     setup_logging(args)
     sys.exit(args.func(args))
 
