@@ -77,7 +77,11 @@ SYNAPSE_ROOT_DIR = '/var/run/synapse'
 
 @pytest.yield_fixture(scope="module")
 def setup():
-    os.makedirs(SYNAPSE_ROOT_DIR)
+    try:
+        os.makedirs(SYNAPSE_ROOT_DIR)
+    except OSError:
+        # Path already exists
+        pass
 
     zk = kazoo.client.KazooClient(hosts=ZOOKEEPER_CONNECT_STRING)
     zk.start()

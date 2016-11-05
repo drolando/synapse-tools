@@ -19,10 +19,11 @@ setup(
         'argparse==1.2.1',
         'environment_tools>=1.1.0,<1.2.0',
         'plumbum>=1.6.0,<1.7.0',
+        'protobuf==2.6.1',
         'psutil>=2.1.1,<2.2.0',
         'PyYAML>=3.11,<4.0.0',
         'pyroute2>=0.3.4,<0.4.0',
-        'paasta-tools==0.16.10',
+        'paasta-tools==0.56.0',
     ],
     entry_points={
         'console_scripts': [
