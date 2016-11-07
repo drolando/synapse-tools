@@ -3,12 +3,17 @@ MAINTAINER John Billings <billings@yelp.com>
 
 RUN apt-get update
 
-RUN apt-get -y install dpkg-dev python-tox python-setuptools
-RUN apt-get -y install python2.7-dev debhelper libyaml-dev libcurl4-openssl-dev
-
-# Make sure we get a package suitable for building this package correctly.
-# Per dnephin we need https://github.com/spotify/dh-virtualenv/pull/20
-# Which at this time is in this package
-RUN apt-get -y install dh-virtualenv=0.6-yelp2
+RUN apt-get -y install \
+    dpkg-dev \
+    python-tox \
+    python-setuptools \
+    python2.7-dev \
+    debhelper \
+    libyaml-dev \
+    libcurl4-openssl-dev \
+    libffi-dev \
+    libssl-dev \
+    build-essential \
+    dh-virtualenv
 
 WORKDIR /work

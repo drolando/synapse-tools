@@ -6,6 +6,7 @@ dist/
 synapse-tools*.changes
 synapse-tools*.dsc
 synapse-tools*.tar.gz
+src/.eggs
 src/build
 src/debian/files
 src/debian/synapse-tools

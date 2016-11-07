@@ -1,7 +1,7 @@
 FROM ubuntu:14.04
 MAINTAINER John Billings <billings@yelp.com>
 
-RUN apt-get update && apt-get -y install  \
+RUN apt-get update && apt-get -y install \
 	libcurl3 \
 	iptables \
 	python-setuptools \
@@ -10,14 +10,20 @@ RUN apt-get update && apt-get -y install  \
 	python-kazoo \
 	python-zope.interface \
 	python2.7 \
-	build-essential
+    ruby1.9.1 \
+    ruby1.9.1-dev \
+    rubygems1.9.1 \
+    libxml2 \
+    libxml2-dev \
+    libxslt-dev \
+    build-essential \
+    zlib1g-dev
 
 ADD https://github.com/haproxy/haproxy/archive/v1.6.0.tar.gz /haproxy.tar.gz
 RUN tar -axvf /haproxy.tar.gz
 WORKDIR /haproxy-1.6.0
 RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
 
-RUN apt-get install -yq ruby1.9.1 ruby1.9.1-dev rubygems1.9.1 zlib1g-dev
 RUN gem install --no-ri --no-rdoc synapse -v 0.12.1
 
 ADD synapse.conf /etc/init/synapse.conf
