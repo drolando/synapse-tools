@@ -7,6 +7,8 @@ main:
   healthcheck_uri: /lil_brudder
   allredisp: False
   discover: habitat
+  advertise:
+  - habitat
   extra_headers:
     X-Mode: ro
   extra_healthcheck_headers:

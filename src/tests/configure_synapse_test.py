@@ -11,6 +11,7 @@ def mock_get_current_location():
     def f(typ):
         return {
             'region': 'my_region',
+            'superregion': 'my_superregion',
         }[typ]
     with mock.patch('synapse_tools.configure_synapse.get_current_location',
                     side_effect=f):
@@ -28,29 +29,44 @@ def test_get_zookeeper_topology():
 
 
 def test_generate_configuration(mock_get_current_location):
-    actual_configuration = configure_synapse.generate_configuration(
-        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
-        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
-        services=[
-            (
-                'test_service',
-                {
-                    'proxy_port': 1234,
-                    'healthcheck_uri': '/status',
-                    'retries': 2,
-                    'timeout_connect_ms': 2000,
-                    'timeout_server_ms': 3000,
-                    'extra_headers': {
-                        'X-Mode': 'ro'
-                    },
-                    'extra_healthcheck_headers': {
-                        'X-Mode': 'ro'
-                    },
-                    'balance': 'roundrobin',
-                }
-            )
-        ]
-    )
+    def compare_types_side_effect(type1, type2):
+        return {
+            ('region', 'region'): 0,
+            ('superregion', 'superregion'): 0,
+            ('superregion', 'region'): -1,
+            ('region', 'superregion'): 1,
+        }[(type1, type2)]
+
+    with mock.patch(
+        'synapse_tools.configure_synapse.compare_types',
+        autospec=True,
+        side_effect=compare_types_side_effect,
+    ):
+        actual_configuration = configure_synapse.generate_configuration(
+            synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
+            zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+            services=[
+                (
+                    'test_service',
+                    {
+                        'proxy_port': 1234,
+                        'healthcheck_uri': '/status',
+                        'retries': 2,
+                        'timeout_connect_ms': 2000,
+                        'timeout_server_ms': 3000,
+                        'extra_headers': {
+                            'X-Mode': 'ro'
+                        },
+                        'extra_healthcheck_headers': {
+                            'X-Mode': 'ro'
+                        },
+                        'balance': 'roundrobin',
+                        'advertise': ['region', 'superregion'],
+                        'discover': 'region',
+                    }
+                )
+            ]
+        )
 
     expected_configuration = configure_synapse.generate_base_config(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
@@ -62,7 +78,61 @@ def test_generate_configuration(mock_get_current_location):
             'discovery': {
                 'hosts': ['1.2.3.4', '2.3.4.5'],
                 'method': 'zookeeper',
-                'path': '/nerve/region:my_region/test_service'},
+                'path': '/nerve/all/test_service',
+                'label_filters': [
+                    {
+                        'label': 'region',
+                        'value': 'my_region',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
+                    'balance roundrobin',
+                ],
+                'frontend': [
+                    'timeout client 3000ms',
+                    'capture request header X-B3-SpanId len 64',
+                    'capture request header X-B3-TraceId len 64',
+                    'capture request header X-B3-ParentSpanId len 64',
+                    'capture request header X-B3-Flags len 10',
+                    'capture request header X-B3-Sampled len 10',
+                    'option httplog',
+                    'acl test_service_has_connslots connslots(test_service) gt 0',
+                    'use_backend test_service if test_service_has_connslots',
+                    'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
+                    'use_backend test_service.superregion if test_service.superregion_has_connslots',
+                    'default_backend test_service',
+                ],
+                'backend': [
+                    'reqidel ^X-Mode:.*',
+                    'reqadd X-Mode:\ ro',
+                ],
+                'port': '1234',
+                'server_options': 'check port 6666 observe layer7'
+            },
+        },
+        'test_service.superregion': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/nerve/all/test_service',
+                'label_filters': [
+                    {
+                        'label': 'superregion',
+                        'value': 'my_superregion',
+                        'condition': 'equals',
+                    },
+                ],
+            },
             'haproxy': {
                 'listen': [
                     'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
@@ -85,10 +155,9 @@ def test_generate_configuration(mock_get_current_location):
                     'reqidel ^X-Mode:.*',
                     'reqadd X-Mode:\ ro',
                 ],
-                'port': '1234',
                 'server_options': 'check port 6666 observe layer7'
-            }
-        }
+            },
+        },
     }
 
     assert actual_configuration == expected_configuration

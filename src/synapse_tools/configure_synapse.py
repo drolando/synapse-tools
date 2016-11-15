@@ -1,6 +1,7 @@
 """Update the synapse configuration file and restart synapse if anything has
 changed."""
 
+import copy
 import filecmp
 import json
 import os
@@ -9,6 +10,7 @@ import subprocess
 import tempfile
 
 import yaml
+from environment_tools.type_utils import compare_types
 from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
 from yaml import CLoader
@@ -155,6 +157,41 @@ def generate_base_config(synapse_tools_config):
     return base_config
 
 
+def get_backend_name(service_name, discover_type, advertise_type):
+    if advertise_type == discover_type:
+        return service_name
+    else:
+        return '%s.%s' % (service_name, advertise_type)
+
+
+def generate_acls_for_service(service_name, discover_type, advertise_types):
+    frontend_acl_configs = []
+    for advertise_type in advertise_types:
+        if compare_types(discover_type, advertise_type) < 0:
+            # don't create acls that downcast requests
+            continue
+
+        backend_identifier = get_backend_name(
+            service_name=service_name,
+            discover_type=discover_type,
+            advertise_type=advertise_type,
+        )
+
+        # use connslots acl condition
+        frontend_acl_configs.extend(
+            [
+                'acl {backend_identifier}_has_connslots connslots({backend_identifier}) gt 0'.format(
+                    backend_identifier=backend_identifier,
+                ),
+                'use_backend {backend_identifier} if {backend_identifier}_has_connslots'.format(
+                    backend_identifier=backend_identifier,
+                ),
+            ]
+        )
+    frontend_acl_configs.append('default_backend {}'.format(service_name))
+    return frontend_acl_configs
+
+
 def generate_configuration(synapse_tools_config, zookeeper_topology, services):
     synapse_config = generate_base_config(synapse_tools_config)
 
@@ -162,19 +199,54 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         if service_info.get('proxy_port') is None:
             continue
 
-        synapse_config['services'][service_name] = haproxy_cfg_for_service(
-            service_name,
-            service_info,
-            zookeeper_topology,
-            synapse_tools_config,
+        discover_type = service_info.get('discover', 'region')
+        advertise_types = service_info.get('advertise', ['region'])
+        if discover_type not in advertise_types:
+            return {}
+
+        proxy_port = service_info['proxy_port']
+
+        base_haproxy_cfg = base_haproxy_cfg_for_service(
+            service_name=service_name,
+            service_info=service_info,
+            zookeeper_topology=zookeeper_topology,
+            synapse_tools_config=synapse_tools_config,
         )
+
+        for advertise_type in advertise_types:
+            config = copy.deepcopy(base_haproxy_cfg)
+
+            backend_identifier = get_backend_name(service_name, discover_type, advertise_type)
+
+            if advertise_type == discover_type:
+                # Specify a proxy port to create a frontend for this service
+                config['haproxy']['port'] = str(proxy_port)
+
+            config['discovery']['label_filters'] = [
+                {
+                    'label': advertise_type,
+                    'value': get_current_location(advertise_type),
+                    'condition': 'equals',
+                },
+            ]
+
+            synapse_config['services'][backend_identifier] = config
+
+        if len(advertise_types) > 1:
+            # add the frontend acl config to the service that corresponds to
+            # the discover key
+            synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                generate_acls_for_service(
+                    service_name=service_name,
+                    discover_type=discover_type,
+                    advertise_types=advertise_types,
+                )
+            )
 
     return synapse_config
 
 
-def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config):
-    proxy_port = service_info['proxy_port']
-
+def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config):
     # If the service sets one timeout but not the other, set both
     # as per haproxy best practices.
     default_timeout = max(
@@ -268,12 +340,9 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, syna
     if balance is not None and balance in ('leastconn', 'roundrobin'):
         listen_options.append('balance %s' % balance)
 
-    discover_type = service_info.get('discover', 'region')
-    location = get_current_location(discover_type)
-
     discovery = {
         'method': 'zookeeper',
-        'path': '/nerve/%s:%s/%s' % (discover_type, location, service_name),
+        'path': '/nerve/all/%s' % service_name,
         'hosts': zookeeper_topology,
     }
 
@@ -289,11 +358,10 @@ def haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, syna
         'use_previous_backends': False,
         'discovery': discovery,
         'haproxy': {
-            'port': '%d' % proxy_port,
             'server_options': server_options,
             'frontend': frontend_options,
             'listen': listen_options,
-            'backend': backend_options
+            'backend': backend_options,
         }
     }
 

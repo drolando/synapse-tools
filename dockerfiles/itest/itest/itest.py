@@ -26,7 +26,8 @@ SERVICES = {
         'proxy_port': 20060,
         'mode': 'http',
         'healthcheck_uri': '/my_healthcheck_endpoint',
-        'discover': 'habitat'
+        'discover': 'habitat',
+        'advertise': ['habitat', 'advertise'],
     },
 
     # TCP service
@@ -36,7 +37,8 @@ SERVICES = {
         'port': 1025,
         'proxy_port': 20028,
         'mode': 'tcp',
-        'discover': 'region'
+        'discover': 'region',
+        'advertise': ['region'],
     },
 
     # HTTP service with a custom endpoint and chaos
@@ -48,7 +50,8 @@ SERVICES = {
         'mode': 'http',
         'healthcheck_uri': '/my_healthcheck_endpoint',
         'chaos': True,
-        'discover': 'region'
+        'discover': 'region',
+        'advertise': ['region'],
     },
 
     # HTTP with headers required for the healthcheck
@@ -59,11 +62,12 @@ SERVICES = {
         'proxy_port': 20090,
         'mode': 'http',
         'discover': 'habitat',
+        'advertise': ['habitat'],
         'healthcheck_uri': '/lil_brudder',
         'extra_healthcheck_headers': {
             'X-Mode': 'ro',
-        }
-    }
+        },
+    },
 }
 
 # How long Synapse gets to configure HAProxy on startup.  This value is
@@ -89,10 +93,16 @@ def setup():
         # Fake out a nerve registration in Zookeeper for each service
         for name, data in SERVICES.iteritems():
             zk.create(
-                path=('/nerve/%s:my_%s/%s/itesthost' %
-                      (data['discover'], data['discover'], name)),
-                value=('{"host": "%s", "port": %d, "name": "%s"}' %
-                       (data['ip_address'], data['port'], data['host'])),
+                path=('/nerve/all/%s/itesthost' % name),
+                value=(json.dumps({
+                    'host': data['ip_address'],
+                    'port': data['port'],
+                    'name': data['host'],
+                    'labels': {
+                        advertise_typ: 'my_%s' % advertise_typ
+                        for advertise_typ in data['advertise']
+                    },
+                })),
                 ephemeral=True,
                 sequence=True,
                 makepath=True,
@@ -133,7 +143,13 @@ def test_synapse_qdisc_tool(setup):
 
 
 def test_synapse_services(setup):
-    expected_services = ['service_three.main', 'service_one.main', 'service_three_chaos.main', 'service_two.main']
+    expected_services = [
+        'service_three.main',
+        'service_three.main.region',
+        'service_one.main',
+        'service_three_chaos.main',
+        'service_two.main',
+    ]
 
     with open('/etc/synapse/synapse.conf.json') as fd:
         synapse_config = json.load(fd)
@@ -149,7 +165,67 @@ def test_http_synapse_service_config(setup):
         'discovery': {
             'hosts': [ZOOKEEPER_CONNECT_STRING],
             'method': 'zookeeper',
-            'path': '/nerve/habitat:my_habitat/service_three.main'},
+            'path': '/nerve/all/service_three.main',
+            'label_filters': [
+                {
+                    'label': 'habitat',
+                    'value': 'my_habitat',
+                    'condition': 'equals',
+                },
+            ],
+        },
+        'haproxy': {
+            'listen': [
+                'option httpchk GET /http/service_three.main/0/my_healthcheck_endpoint',
+                'http-check send-state',
+                'retries 2',
+                'timeout connect 10000ms',
+                'timeout server 11000ms'
+            ],
+            'frontend': [
+                'timeout client 11000ms',
+                'capture request header X-B3-SpanId len 64',
+                'capture request header X-B3-TraceId len 64',
+                'capture request header X-B3-ParentSpanId len 64',
+                'capture request header X-B3-Flags len 10',
+                'capture request header X-B3-Sampled len 10',
+                'option httplog',
+                'acl service_three.main_has_connslots connslots(service_three.main) gt 0',
+                'use_backend service_three.main if service_three.main_has_connslots',
+                'acl service_three.main.region_has_connslots connslots(service_three.main.region) gt 0',
+                'use_backend service_three.main.region if service_three.main.region_has_connslots',
+                'default_backend service_three.main',
+            ],
+            'backend': [
+            ],
+            'port': '20060',
+            'server_options': 'check port 6666 observe layer7'
+        }
+    }
+
+    with open('/etc/synapse/synapse.conf.json') as fd:
+        synapse_config = json.load(fd)
+
+    actual_service_entry = synapse_config['services'].get('service_three.main')
+    assert expected_service_entry == actual_service_entry
+
+
+def test_backup_http_synapse_service_config(setup):
+    expected_service_entry = {
+        'default_servers': [],
+        'use_previous_backends': False,
+        'discovery': {
+            'hosts': [ZOOKEEPER_CONNECT_STRING],
+            'method': 'zookeeper',
+            'path': '/nerve/all/service_three.main',
+            'label_filters': [
+                {
+                    'label': 'region',
+                    'value': 'my_region',
+                    'condition': 'equals',
+                },
+            ],
+        },
         'haproxy': {
             'listen': [
                 'option httpchk GET /http/service_three.main/0/my_healthcheck_endpoint',
@@ -169,7 +245,6 @@ def test_http_synapse_service_config(setup):
             ],
             'backend': [
             ],
-            'port': '20060',
             'server_options': 'check port 6666 observe layer7'
         }
     }
@@ -177,7 +252,7 @@ def test_http_synapse_service_config(setup):
     with open('/etc/synapse/synapse.conf.json') as fd:
         synapse_config = json.load(fd)
 
-    actual_service_entry = synapse_config['services'].get('service_three.main')
+    actual_service_entry = synapse_config['services'].get('service_three.main.region')
     assert expected_service_entry == actual_service_entry
 
 
@@ -188,7 +263,15 @@ def test_tcp_synapse_service_config(setup):
         'discovery': {
             'hosts': [ZOOKEEPER_CONNECT_STRING],
             'method': 'zookeeper',
-            'path': '/nerve/region:my_region/service_one.main'},
+            'path': '/nerve/all/service_one.main',
+            'label_filters': [
+                {
+                    'label': 'region',
+                    'value': 'my_region',
+                    'condition': 'equals',
+                },
+            ],
+        },
         'haproxy': {
             'listen': [
                 'option httpchk GET /tcp/service_one.main/0/status',
@@ -250,7 +333,7 @@ def test_synapse_haproxy_stats_page(setup):
             if 'chaos' in data:
                 continue
 
-            svname = '%s:%d_%s' % (data['ip_address'], data['port'], data['host'])
+            svname = '%s_%s:%d' % (data['host'], data['ip_address'], data['port'])
             check_status = 'L7OK'
             assert (name, svname, check_status) in rows
 
