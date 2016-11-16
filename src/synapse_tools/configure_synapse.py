@@ -188,7 +188,16 @@ def generate_acls_for_service(service_name, discover_type, advertise_types):
                 ),
             ]
         )
-    frontend_acl_configs.append('default_backend {}'.format(service_name))
+    frontend_acl_configs.extend(
+        [
+            line.format(service_name=service_name)
+            for line in [
+                'acl {service_name}.remote_has_connslots connslots({service_name}.remote) gt 0',
+                'use_backend {service_name}.remote if {service_name}.remote_has_connslots',
+                'default_backend {service_name}',
+            ]
+        ]
+    )
     return frontend_acl_configs
 
 
@@ -232,16 +241,27 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             synapse_config['services'][backend_identifier] = config
 
-        if len(advertise_types) > 1:
-            # add the frontend acl config to the service that corresponds to
-            # the discover key
-            synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                generate_acls_for_service(
-                    service_name=service_name,
-                    discover_type=discover_type,
-                    advertise_types=advertise_types,
-                )
+        # create the remote backend
+        remote_config = copy.deepcopy(base_haproxy_cfg)
+        remote_config['discovery']['label_filters'] = [
+            {
+                'label': advertise_type,
+                'value': get_current_location(advertise_type),
+                'condition': 'not-equals',
+            }
+            for advertise_type in advertise_types
+        ]
+
+        synapse_config['services']['%s.remote' % service_name] = remote_config
+
+        # populate the ACLs to route to the service backends
+        synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+            generate_acls_for_service(
+                service_name=service_name,
+                discover_type=discover_type,
+                advertise_types=advertise_types,
             )
+        )
 
     return synapse_config
 
@@ -342,7 +362,7 @@ def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology,
 
     discovery = {
         'method': 'zookeeper',
-        'path': '/nerve/all/%s' % service_name,
+        'path': '/smartstack/global/%s' % service_name,
         'hosts': zookeeper_topology,
     }
 

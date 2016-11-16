@@ -93,7 +93,7 @@ def setup():
         # Fake out a nerve registration in Zookeeper for each service
         for name, data in SERVICES.iteritems():
             zk.create(
-                path=('/nerve/all/%s/itesthost' % name),
+                path=('/smartstack/global/%s/itesthost' % name),
                 value=(json.dumps({
                     'host': data['ip_address'],
                     'port': data['port'],
@@ -146,9 +146,13 @@ def test_synapse_services(setup):
     expected_services = [
         'service_three.main',
         'service_three.main.region',
+        'service_three.main.remote',
         'service_one.main',
+        'service_one.main.remote',
         'service_three_chaos.main',
+        'service_three_chaos.main.remote',
         'service_two.main',
+        'service_two.main.remote',
     ]
 
     with open('/etc/synapse/synapse.conf.json') as fd:
@@ -165,7 +169,7 @@ def test_http_synapse_service_config(setup):
         'discovery': {
             'hosts': [ZOOKEEPER_CONNECT_STRING],
             'method': 'zookeeper',
-            'path': '/nerve/all/service_three.main',
+            'path': '/smartstack/global/service_three.main',
             'label_filters': [
                 {
                     'label': 'habitat',
@@ -194,6 +198,8 @@ def test_http_synapse_service_config(setup):
                 'use_backend service_three.main if service_three.main_has_connslots',
                 'acl service_three.main.region_has_connslots connslots(service_three.main.region) gt 0',
                 'use_backend service_three.main.region if service_three.main.region_has_connslots',
+                'acl service_three.main.remote_has_connslots connslots(service_three.main.remote) gt 0',
+                'use_backend service_three.main.remote if service_three.main.remote_has_connslots',
                 'default_backend service_three.main',
             ],
             'backend': [
@@ -217,7 +223,7 @@ def test_backup_http_synapse_service_config(setup):
         'discovery': {
             'hosts': [ZOOKEEPER_CONNECT_STRING],
             'method': 'zookeeper',
-            'path': '/nerve/all/service_three.main',
+            'path': '/smartstack/global/service_three.main',
             'label_filters': [
                 {
                     'label': 'region',
@@ -256,6 +262,57 @@ def test_backup_http_synapse_service_config(setup):
     assert expected_service_entry == actual_service_entry
 
 
+def test_remote_http_synapse_service_config(setup):
+    expected_service_entry = {
+        'default_servers': [],
+        'use_previous_backends': False,
+        'discovery': {
+            'hosts': [ZOOKEEPER_CONNECT_STRING],
+            'method': 'zookeeper',
+            'path': '/smartstack/global/service_three.main',
+            'label_filters': [
+                {
+                    'label': 'habitat',
+                    'value': 'my_habitat',
+                    'condition': 'not-equals',
+                },
+                {
+                    'label': 'region',
+                    'value': 'my_region',
+                    'condition': 'not-equals',
+                },
+            ],
+        },
+        'haproxy': {
+            'listen': [
+                'option httpchk GET /http/service_three.main/0/my_healthcheck_endpoint',
+                'http-check send-state',
+                'retries 2',
+                'timeout connect 10000ms',
+                'timeout server 11000ms'
+            ],
+            'frontend': [
+                'timeout client 11000ms',
+                'capture request header X-B3-SpanId len 64',
+                'capture request header X-B3-TraceId len 64',
+                'capture request header X-B3-ParentSpanId len 64',
+                'capture request header X-B3-Flags len 10',
+                'capture request header X-B3-Sampled len 10',
+                'option httplog',
+            ],
+            'backend': [
+            ],
+            'server_options': 'check port 6666 observe layer7'
+        }
+    }
+
+    with open('/etc/synapse/synapse.conf.json') as fd:
+        synapse_config = json.load(fd)
+
+    actual_service_entry = synapse_config['services'].get('service_three.main.remote')
+    assert expected_service_entry == actual_service_entry
+
+
 def test_tcp_synapse_service_config(setup):
     expected_service_entry = {
         'default_servers': [],
@@ -263,7 +320,7 @@ def test_tcp_synapse_service_config(setup):
         'discovery': {
             'hosts': [ZOOKEEPER_CONNECT_STRING],
             'method': 'zookeeper',
-            'path': '/nerve/all/service_one.main',
+            'path': '/smartstack/global/service_one.main',
             'label_filters': [
                 {
                     'label': 'region',
@@ -283,6 +340,11 @@ def test_tcp_synapse_service_config(setup):
             'frontend': [
                 'timeout client 12000ms',
                 'option tcplog',
+                'acl service_one.main_has_connslots connslots(service_one.main) gt 0',
+                'use_backend service_one.main if service_one.main_has_connslots',
+                'acl service_one.main.remote_has_connslots connslots(service_one.main.remote) gt 0',
+                'use_backend service_one.main.remote if service_one.main.remote_has_connslots',
+                'default_backend service_one.main',
             ],
             'backend': [
             ],
