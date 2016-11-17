@@ -87,6 +87,11 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                         'value': 'my_region',
                         'condition': 'equals',
                     },
+                    {
+                        'label': 'remote',
+                        'value': 'false',
+                        'condition': 'equals',
+                    },
                 ],
             },
             'haproxy': {
@@ -135,6 +140,11 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                         'value': 'my_superregion',
                         'condition': 'equals',
                     },
+                    {
+                        'label': 'remote',
+                        'value': 'false',
+                        'condition': 'equals',
+                    },
                 ],
             },
             'haproxy': {
@@ -171,14 +181,14 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 'path': '/smartstack/global/test_service',
                 'label_filters': [
                     {
-                        'label': 'region',
+                        'label': 'remote_dst_loc',
                         'value': 'my_region',
-                        'condition': 'not-equals',
+                        'condition': 'equals',
                     },
                     {
-                        'label': 'superregion',
-                        'value': 'my_superregion',
-                        'condition': 'not-equals',
+                        'label': 'remote',
+                        'value': 'true',
+                        'condition': 'equals',
                     },
                 ],
             },

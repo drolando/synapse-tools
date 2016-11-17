@@ -237,6 +237,11 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     'value': get_current_location(advertise_type),
                     'condition': 'equals',
                 },
+                {
+                    'label': 'remote',
+                    'value': 'false',
+                    'condition': 'equals',
+                },
             ]
 
             synapse_config['services'][backend_identifier] = config
@@ -245,11 +250,15 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         remote_config = copy.deepcopy(base_haproxy_cfg)
         remote_config['discovery']['label_filters'] = [
             {
-                'label': advertise_type,
-                'value': get_current_location(advertise_type),
-                'condition': 'not-equals',
-            }
-            for advertise_type in advertise_types
+                'label': 'remote_dst_loc',
+                'value': get_current_location(discover_type),
+                'condition': 'equals',
+            },
+            {
+                'label': 'remote',
+                'value': 'true',
+                'condition': 'equals',
+            },
         ]
 
         synapse_config['services']['%s.remote' % service_name] = remote_config

@@ -92,16 +92,18 @@ def setup():
     try:
         # Fake out a nerve registration in Zookeeper for each service
         for name, data in SERVICES.iteritems():
+            labels = {
+                advertise_typ: 'my_%s' % advertise_typ
+                for advertise_typ in data['advertise']
+            }
+            labels['remote'] = 'false'
             zk.create(
                 path=('/smartstack/global/%s/itesthost' % name),
                 value=(json.dumps({
                     'host': data['ip_address'],
                     'port': data['port'],
                     'name': data['host'],
-                    'labels': {
-                        advertise_typ: 'my_%s' % advertise_typ
-                        for advertise_typ in data['advertise']
-                    },
+                    'labels': labels,
                 })),
                 ephemeral=True,
                 sequence=True,
@@ -176,6 +178,11 @@ def test_http_synapse_service_config(setup):
                     'value': 'my_habitat',
                     'condition': 'equals',
                 },
+                {
+                    'label': 'remote',
+                    'value': 'false',
+                    'condition': 'equals',
+                },
             ],
         },
         'haproxy': {
@@ -230,6 +237,11 @@ def test_backup_http_synapse_service_config(setup):
                     'value': 'my_region',
                     'condition': 'equals',
                 },
+                {
+                    'label': 'remote',
+                    'value': 'false',
+                    'condition': 'equals',
+                },
             ],
         },
         'haproxy': {
@@ -272,14 +284,14 @@ def test_remote_http_synapse_service_config(setup):
             'path': '/smartstack/global/service_three.main',
             'label_filters': [
                 {
-                    'label': 'habitat',
+                    'label': 'remote_dst_loc',
                     'value': 'my_habitat',
-                    'condition': 'not-equals',
+                    'condition': 'equals',
                 },
                 {
-                    'label': 'region',
-                    'value': 'my_region',
-                    'condition': 'not-equals',
+                    'label': 'remote',
+                    'value': 'true',
+                    'condition': 'equals',
                 },
             ],
         },
@@ -325,6 +337,11 @@ def test_tcp_synapse_service_config(setup):
                 {
                     'label': 'region',
                     'value': 'my_region',
+                    'condition': 'equals',
+                },
+                {
+                    'label': 'remote',
+                    'value': 'false',
                     'condition': 'equals',
                 },
             ],
