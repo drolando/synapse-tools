@@ -96,7 +96,6 @@ def setup():
                 advertise_typ: 'my_%s' % advertise_typ
                 for advertise_typ in data['advertise']
             }
-            labels['remote'] = 'false'
             zk.create(
                 path=('/smartstack/global/%s/itesthost' % name),
                 value=(json.dumps({
@@ -178,11 +177,6 @@ def test_http_synapse_service_config(setup):
                     'value': 'my_habitat',
                     'condition': 'equals',
                 },
-                {
-                    'label': 'remote',
-                    'value': 'false',
-                    'condition': 'equals',
-                },
             ],
         },
         'haproxy': {
@@ -237,11 +231,6 @@ def test_backup_http_synapse_service_config(setup):
                     'value': 'my_region',
                     'condition': 'equals',
                 },
-                {
-                    'label': 'remote',
-                    'value': 'false',
-                    'condition': 'equals',
-                },
             ],
         },
         'haproxy': {
@@ -284,13 +273,8 @@ def test_remote_http_synapse_service_config(setup):
             'path': '/smartstack/global/service_three.main',
             'label_filters': [
                 {
-                    'label': 'remote_dst_loc',
+                    'label': 'remote_habitat',
                     'value': 'my_habitat',
-                    'condition': 'equals',
-                },
-                {
-                    'label': 'remote',
-                    'value': 'true',
                     'condition': 'equals',
                 },
             ],
@@ -337,11 +321,6 @@ def test_tcp_synapse_service_config(setup):
                 {
                     'label': 'region',
                     'value': 'my_region',
-                    'condition': 'equals',
-                },
-                {
-                    'label': 'remote',
-                    'value': 'false',
                     'condition': 'equals',
                 },
             ],

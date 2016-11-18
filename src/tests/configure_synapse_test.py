@@ -20,15 +20,22 @@ def mock_get_current_location():
 
 @pytest.yield_fixture
 def mock_available_location_types():
-    with mock.patch(
-        'environment_tools.type_utils.available_location_types',
-        return_value=[
-            'runtimeenv',
-            'ecosystem',
-            'superregion',
-            'region',
-            'habitat',
-        ],
+    mock_types = [
+        'runtimeenv',
+        'ecosystem',
+        'superregion',
+        'region',
+        'habitat',
+    ]
+    with contextlib.nested(
+        mock.patch(
+            'environment_tools.type_utils.available_location_types',
+            return_value=mock_types,
+        ),
+        mock.patch(
+            'synapse_tools.configure_synapse.available_location_types',
+            return_value=mock_types,
+        ),
     ):
         yield
 
@@ -70,6 +77,32 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
         ]
     )
 
+    actual_configuration_reversed_advertise = configure_synapse.generate_configuration(
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            (
+                'test_service',
+                {
+                    'proxy_port': 1234,
+                    'healthcheck_uri': '/status',
+                    'retries': 2,
+                    'timeout_connect_ms': 2000,
+                    'timeout_server_ms': 3000,
+                    'extra_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'extra_healthcheck_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'balance': 'roundrobin',
+                    'advertise': ['superregion', 'region'],
+                    'discover': 'region',
+                }
+            )
+        ]
+    )
+
     expected_configuration = configure_synapse.generate_base_config(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
     )
@@ -85,11 +118,6 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                     {
                         'label': 'region',
                         'value': 'my_region',
-                        'condition': 'equals',
-                    },
-                    {
-                        'label': 'remote',
-                        'value': 'false',
                         'condition': 'equals',
                     },
                 ],
@@ -140,11 +168,6 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                         'value': 'my_superregion',
                         'condition': 'equals',
                     },
-                    {
-                        'label': 'remote',
-                        'value': 'false',
-                        'condition': 'equals',
-                    },
                 ],
             },
             'haproxy': {
@@ -181,13 +204,8 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 'path': '/smartstack/global/test_service',
                 'label_filters': [
                     {
-                        'label': 'remote_dst_loc',
+                        'label': 'remote_region',
                         'value': 'my_region',
-                        'condition': 'equals',
-                    },
-                    {
-                        'label': 'remote',
-                        'value': 'true',
                         'condition': 'equals',
                     },
                 ],
@@ -220,9 +238,10 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
     }
 
     assert actual_configuration == expected_configuration
+    assert actual_configuration_reversed_advertise == expected_configuration
 
 
-def test_generate_configuration_empty():
+def test_generate_configuration_empty(mock_available_location_types):
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
         zookeeper_topology=['1.2.3.4', '2.3.4.5'],

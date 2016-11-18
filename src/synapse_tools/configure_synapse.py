@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 
 import yaml
+from environment_tools.type_utils import available_location_types
 from environment_tools.type_utils import compare_types
 from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
@@ -203,13 +204,22 @@ def generate_acls_for_service(service_name, discover_type, advertise_types):
 
 def generate_configuration(synapse_tools_config, zookeeper_topology, services):
     synapse_config = generate_base_config(synapse_tools_config)
+    available_locations = available_location_types()
+    location_depth_mapping = {
+        loc: depth
+        for depth, loc in enumerate(available_locations)
+    }
 
     for (service_name, service_info) in services:
         if service_info.get('proxy_port') is None:
             continue
 
         discover_type = service_info.get('discover', 'region')
-        advertise_types = service_info.get('advertise', ['region'])
+        advertise_types = sorted(
+            service_info.get('advertise', ['region']),
+            key=lambda typ: location_depth_mapping[typ],
+            reverse=True,  # consider the most specific types first
+        )
         if discover_type not in advertise_types:
             return {}
 
@@ -237,11 +247,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     'value': get_current_location(advertise_type),
                     'condition': 'equals',
                 },
-                {
-                    'label': 'remote',
-                    'value': 'false',
-                    'condition': 'equals',
-                },
             ]
 
             synapse_config['services'][backend_identifier] = config
@@ -250,13 +255,8 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         remote_config = copy.deepcopy(base_haproxy_cfg)
         remote_config['discovery']['label_filters'] = [
             {
-                'label': 'remote_dst_loc',
+                'label': 'remote_%s' % discover_type,
                 'value': get_current_location(discover_type),
-                'condition': 'equals',
-            },
-            {
-                'label': 'remote',
-                'value': 'true',
                 'condition': 'equals',
             },
         ]
