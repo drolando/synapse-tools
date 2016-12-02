@@ -28,6 +28,8 @@ def set_defaults(config):
     config.setdefault('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock')
     config.setdefault('haproxy_config_path', '/var/run/synapse/haproxy.cfg')
     config.setdefault('maximum_connections', 10000)
+    config.setdefault('maxconn_per_server', 50)
+    config.setdefault('maxqueue_per_server', 10)
     config.setdefault('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock')
     config.setdefault('synapse_restart_command', ['service', 'synapse', 'restart'])
     config.setdefault('zookeeper_topology_path', '/nail/etc/zookeeper_discovery/infrastructure/local.yaml')
@@ -224,7 +226,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         if discover_type not in advertise_types:
             return {}
 
-
         base_haproxy_cfg = base_haproxy_cfg_for_service(
             service_name=service_name,
             service_info=service_info,
@@ -249,10 +250,13 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 },
             ]
 
+            config['haproxy']['backend_name'] = backend_identifier
+
             synapse_config['services'][backend_identifier] = config
 
         # create the remote backend
         remote_config = copy.deepcopy(base_haproxy_cfg)
+        remote_backend_name = '%s.remote' % service_name
         remote_config['discovery']['label_filters'] = [
             {
                 'label': 'remote_%s' % discover_type,
@@ -260,8 +264,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 'condition': 'equals',
             },
         ]
+        remote_config['haproxy']['backend_name'] = remote_backend_name
 
-        synapse_config['services']['%s.remote' % service_name] = remote_config
+        synapse_config['services'][remote_backend_name] = remote_config
 
         # populate the ACLs to route to the service backends
         synapse_config['services'][service_name]['haproxy']['frontend'].extend(
@@ -286,9 +291,14 @@ def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology,
     # Server options
     mode = service_info.get('mode', 'http')
     if mode == 'http':
-        server_options = 'check port %d observe layer7' % synapse_tools_config['hacheck_port']
+        server_options = 'check port %d observe layer7 maxconn %d maxqueue %d'
     else:
-        server_options = 'check port %d observe layer4' % synapse_tools_config['hacheck_port']
+        server_options = 'check port %d observe layer4 maxconn %d maxqueue %d'
+    server_options = server_options % (
+        synapse_tools_config['hacheck_port'],
+        synapse_tools_config['maxconn_per_server'],
+        synapse_tools_config['maxqueue_per_server'],
+    )
 
     # Frontend options
     frontend_options = []

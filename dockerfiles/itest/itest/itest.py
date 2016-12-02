@@ -206,8 +206,9 @@ def test_http_synapse_service_config(setup):
             'backend': [
             ],
             'port': '20060',
-            'server_options': 'check port 6666 observe layer7'
-        }
+            'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+            'backend_name': 'service_three.main',
+        },
     }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
@@ -252,8 +253,9 @@ def test_backup_http_synapse_service_config(setup):
             ],
             'backend': [
             ],
-            'server_options': 'check port 6666 observe layer7'
-        }
+            'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+            'backend_name': 'service_three.main.region',
+        },
     }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
@@ -298,8 +300,9 @@ def test_remote_http_synapse_service_config(setup):
             ],
             'backend': [
             ],
-            'server_options': 'check port 6666 observe layer7'
-        }
+            'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+            'backend_name': 'service_three.main.remote',
+        },
     }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
@@ -345,8 +348,9 @@ def test_tcp_synapse_service_config(setup):
             'backend': [
             ],
             'port': '20028',
-            'server_options': 'check port 6666 observe layer4'
-        }
+            'server_options': 'check port 6666 observe layer4 maxconn 50 maxqueue 10',
+            'backend_name': 'service_one.main',
+        },
     }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
