@@ -211,7 +211,8 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
     }
 
     for (service_name, service_info) in services:
-        if service_info.get('proxy_port') is None:
+        proxy_port = service_info.get('proxy_port')
+        if proxy_port is None:
             continue
 
         discover_type = service_info.get('discover', 'region')
@@ -223,7 +224,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         if discover_type not in advertise_types:
             return {}
 
-        proxy_port = service_info['proxy_port']
 
         base_haproxy_cfg = base_haproxy_cfg_for_service(
             service_name=service_name,
