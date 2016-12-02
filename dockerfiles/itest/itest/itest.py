@@ -27,7 +27,7 @@ SERVICES = {
         'mode': 'http',
         'healthcheck_uri': '/my_healthcheck_endpoint',
         'discover': 'habitat',
-        'advertise': ['habitat', 'advertise'],
+        'advertise': ['habitat', 'region'],
     },
 
     # TCP service
