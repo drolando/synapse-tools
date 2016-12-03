@@ -257,6 +257,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         # create the remote backend
         remote_config = copy.deepcopy(base_haproxy_cfg)
         remote_backend_name = '%s.remote' % service_name
+        # nerve handles extra_advertise by registering a remote server for
+        # every possible discover-level location. synapse then filters by the
+        # local location to find servers that are being extra_advertised to it
         remote_config['discovery']['label_filters'] = [
             {
                 'label': 'remote_%s' % discover_type,
