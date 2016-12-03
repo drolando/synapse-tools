@@ -10,3 +10,6 @@ main:
   healthcheck_uri: /my_healthcheck_endpoint
   allredisp: False
   discover: habitat
+  advertise:
+  - habitat
+  - region
