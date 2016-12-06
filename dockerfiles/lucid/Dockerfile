@@ -7,6 +7,7 @@ RUN apt-get -y install \
     dpkg-dev \
     python-tox \
     python-setuptools \
+    python2.7 \
     python2.7-dev \
     debhelper \
     libyaml-dev \
