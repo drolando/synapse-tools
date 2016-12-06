@@ -92,10 +92,10 @@ def setup():
     try:
         # Fake out a nerve registration in Zookeeper for each service
         for name, data in SERVICES.iteritems():
-            labels = {
-                advertise_typ: 'my_%s' % advertise_typ
+            labels = dict(
+                (advertise_typ, 'my_%s' % advertise_typ)
                 for advertise_typ in data['advertise']
-            }
+            )
             zk.create(
                 path=('/smartstack/global/%s/itesthost' % name),
                 value=(json.dumps({
