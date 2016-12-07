@@ -116,8 +116,8 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 'path': '/smartstack/global/test_service',
                 'label_filters': [
                     {
-                        'label': 'region',
-                        'value': 'my_region',
+                        'label': 'region:my_region',
+                        'value': '',
                         'condition': 'equals',
                     },
                 ],
@@ -143,9 +143,6 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                     'use_backend test_service if test_service_has_connslots',
                     'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
                     'use_backend test_service.superregion if test_service.superregion_has_connslots',
-                    'acl test_service.remote_has_connslots connslots(test_service.remote) gt 0',
-                    'use_backend test_service.remote if test_service.remote_has_connslots',
-                    'default_backend test_service',
                 ],
                 'backend': [
                     'reqidel ^X-Mode:.*',
@@ -165,8 +162,8 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 'path': '/smartstack/global/test_service',
                 'label_filters': [
                     {
-                        'label': 'superregion',
-                        'value': 'my_superregion',
+                        'label': 'superregion:my_superregion',
+                        'value': '',
                         'condition': 'equals',
                     },
                 ],
@@ -195,47 +192,6 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 ],
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
                 'backend_name': 'test_service.superregion',
-            },
-        },
-        'test_service.remote': {
-            'default_servers': [],
-            'use_previous_backends': False,
-            'discovery': {
-                'hosts': ['1.2.3.4', '2.3.4.5'],
-                'method': 'zookeeper',
-                'path': '/smartstack/global/test_service',
-                'label_filters': [
-                    {
-                        'label': 'remote_region',
-                        'value': 'my_region',
-                        'condition': 'equals',
-                    },
-                ],
-            },
-            'haproxy': {
-                'listen': [
-                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
-                    'http-check send-state',
-                    'retries 2',
-                    'timeout connect 2000ms',
-                    'timeout server 3000ms',
-                    'balance roundrobin',
-                ],
-                'frontend': [
-                    'timeout client 3000ms',
-                    'capture request header X-B3-SpanId len 64',
-                    'capture request header X-B3-TraceId len 64',
-                    'capture request header X-B3-ParentSpanId len 64',
-                    'capture request header X-B3-Flags len 10',
-                    'capture request header X-B3-Sampled len 10',
-                    'option httplog',
-                ],
-                'backend': [
-                    'reqidel ^X-Mode:.*',
-                    'reqadd X-Mode:\ ro',
-                ],
-                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
-                'backend_name': 'test_service.remote',
             },
         },
     }
@@ -308,8 +264,8 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
                 'path': '/smartstack/global/test_service',
                 'label_filters': [
                     {
-                        'label': 'region',
-                        'value': 'my_region',
+                        'label': 'region:my_region',
+                        'value': '',
                         'condition': 'equals',
                     },
                 ],
@@ -333,9 +289,6 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
                     'option httplog',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
-                    'acl test_service.remote_has_connslots connslots(test_service.remote) gt 0',
-                    'use_backend test_service.remote if test_service.remote_has_connslots',
-                    'default_backend test_service',
                 ],
                 'backend': [
                     'reqidel ^X-Mode:.*',
@@ -344,47 +297,6 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
                 'port': '1234',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
                 'backend_name': 'test_service',
-            },
-        },
-        'test_service.remote': {
-            'default_servers': [],
-            'use_previous_backends': False,
-            'discovery': {
-                'hosts': ['1.2.3.4', '2.3.4.5'],
-                'method': 'zookeeper',
-                'path': '/smartstack/global/test_service',
-                'label_filters': [
-                    {
-                        'label': 'remote_region',
-                        'value': 'my_region',
-                        'condition': 'equals',
-                    },
-                ],
-            },
-            'haproxy': {
-                'listen': [
-                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
-                    'http-check send-state',
-                    'retries 2',
-                    'timeout connect 2000ms',
-                    'timeout server 3000ms',
-                    'balance roundrobin',
-                ],
-                'frontend': [
-                    'timeout client 3000ms',
-                    'capture request header X-B3-SpanId len 64',
-                    'capture request header X-B3-TraceId len 64',
-                    'capture request header X-B3-ParentSpanId len 64',
-                    'capture request header X-B3-Flags len 10',
-                    'capture request header X-B3-Sampled len 10',
-                    'option httplog',
-                ],
-                'backend': [
-                    'reqidel ^X-Mode:.*',
-                    'reqadd X-Mode:\ ro',
-                ],
-                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
-                'backend_name': 'test_service.remote',
             },
         },
     }

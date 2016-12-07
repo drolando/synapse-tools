@@ -191,16 +191,6 @@ def generate_acls_for_service(service_name, discover_type, advertise_types):
                 ),
             ]
         )
-    frontend_acl_configs.extend(
-        [
-            line.format(service_name=service_name)
-            for line in [
-                'acl {service_name}.remote_has_connslots connslots({service_name}.remote) gt 0',
-                'use_backend {service_name}.remote if {service_name}.remote_has_connslots',
-                'default_backend {service_name}',
-            ]
-        ]
-    )
     return frontend_acl_configs
 
 
@@ -211,6 +201,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         loc: depth
         for depth, loc in enumerate(available_locations)
     }
+    available_locations = set(available_locations)
 
     for (service_name, service_info) in services:
         proxy_port = service_info.get('proxy_port')
@@ -219,7 +210,12 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
         discover_type = service_info.get('discover', 'region')
         advertise_types = sorted(
-            service_info.get('advertise', ['region']),
+            [
+                advertise_typ
+                for advertise_typ in service_info.get('advertise', ['region'])
+                # don't consider invalid advertise types
+                if advertise_typ in available_locations
+            ],
             key=lambda typ: location_depth_mapping[typ],
             reverse=True,  # consider the most specific types first
         )
@@ -244,8 +240,8 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             config['discovery']['label_filters'] = [
                 {
-                    'label': advertise_type,
-                    'value': get_current_location(advertise_type),
+                    'label': '%s:%s' % (advertise_type, get_current_location(advertise_type)),
+                    'value': '',
                     'condition': 'equals',
                 },
             ]
@@ -253,23 +249,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             config['haproxy']['backend_name'] = backend_identifier
 
             synapse_config['services'][backend_identifier] = config
-
-        # create the remote backend
-        remote_config = copy.deepcopy(base_haproxy_cfg)
-        remote_backend_name = '%s.remote' % service_name
-        # nerve handles extra_advertise by registering a remote server for
-        # every possible discover-level location. synapse then filters by the
-        # local location to find servers that are being extra_advertised to it
-        remote_config['discovery']['label_filters'] = [
-            {
-                'label': 'remote_%s' % discover_type,
-                'value': get_current_location(discover_type),
-                'condition': 'equals',
-            },
-        ]
-        remote_config['haproxy']['backend_name'] = remote_backend_name
-
-        synapse_config['services'][remote_backend_name] = remote_config
 
         # populate the ACLs to route to the service backends
         synapse_config['services'][service_name]['haproxy']['frontend'].extend(
