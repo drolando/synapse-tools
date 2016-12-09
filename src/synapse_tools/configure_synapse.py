@@ -290,6 +290,8 @@ def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology,
     if timeout_client_ms is not None:
         frontend_options.append('timeout client %dms' % timeout_client_ms)
 
+    frontend_options.append('bind /var/run/synapse/sockets/%s.sock' % service_name)
+
     if mode == 'http':
         frontend_options.append('capture request header X-B3-SpanId len 64')
         frontend_options.append('capture request header X-B3-TraceId len 64')
