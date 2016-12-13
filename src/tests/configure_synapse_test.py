@@ -133,6 +133,7 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 ],
                 'frontend': [
                     'timeout client 3000ms',
+                    'bind /var/run/synapse/sockets/test_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',
@@ -179,6 +180,7 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 ],
                 'frontend': [
                     'timeout client 3000ms',
+                    'bind /var/run/synapse/sockets/test_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',
@@ -281,6 +283,7 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
                 ],
                 'frontend': [
                     'timeout client 3000ms',
+                    'bind /var/run/synapse/sockets/test_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',

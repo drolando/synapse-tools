@@ -184,6 +184,7 @@ def test_http_synapse_service_config(setup):
                 'timeout server 11000ms'
             ],
             'frontend': [
+                'bind /var/run/synapse/sockets/service_three.main.sock',
                 'timeout client 11000ms',
                 'capture request header X-B3-SpanId len 64',
                 'capture request header X-B3-TraceId len 64',
@@ -236,6 +237,7 @@ def test_backup_http_synapse_service_config(setup):
                 'timeout server 11000ms'
             ],
             'frontend': [
+                'bind /var/run/synapse/sockets/service_three.main.sock',
                 'timeout client 11000ms',
                 'capture request header X-B3-SpanId len 64',
                 'capture request header X-B3-TraceId len 64',
@@ -283,6 +285,7 @@ def test_tcp_synapse_service_config(setup):
                 'timeout server 11000ms'
             ],
             'frontend': [
+                'bind /var/run/synapse/sockets/service_one.main.sock',
                 'timeout client 12000ms',
                 'option tcplog',
                 'acl service_one.main_has_connslots connslots(service_one.main) gt 0',
