@@ -131,6 +131,14 @@ def setup():
         zk.stop()
 
 
+def _sort_lists_in_dict(d):
+    for k in d:
+        if isinstance(d[k], dict):
+            d[k] = _sort_lists_in_dict(d[k])
+        elif isinstance(d[k], list):
+            d[k] = sorted(d[k])
+    return d
+
 def test_haproxy_synapse_reaper(setup):
     # This should run with no errors.  Everything is running as root, so we need
     # to use the --username option here.
@@ -209,6 +217,10 @@ def test_http_synapse_service_config(setup):
         synapse_config = json.load(fd)
 
     actual_service_entry = synapse_config['services'].get('service_three.main')
+
+    actual_service_entry = _sort_lists_in_dict(actual_service_entry)
+    expected_service_entry = _sort_lists_in_dict(expected_service_entry)
+
     assert expected_service_entry == actual_service_entry
 
 
@@ -237,14 +249,14 @@ def test_backup_http_synapse_service_config(setup):
                 'timeout server 11000ms'
             ],
             'frontend': [
+                'option httplog',
                 'timeout client 11000ms',
-                'bind /var/run/synapse/sockets/service_three.main.sock',
                 'capture request header X-B3-SpanId len 64',
+                'bind /var/run/synapse/sockets/service_three.main.sock',
                 'capture request header X-B3-TraceId len 64',
-                'capture request header X-B3-ParentSpanId len 64',
                 'capture request header X-B3-Flags len 10',
                 'capture request header X-B3-Sampled len 10',
-                'option httplog',
+                'capture request header X-B3-ParentSpanId len 64',
             ],
             'backend': [
             ],
@@ -257,6 +269,10 @@ def test_backup_http_synapse_service_config(setup):
         synapse_config = json.load(fd)
 
     actual_service_entry = synapse_config['services'].get('service_three.main.region')
+
+    actual_service_entry = _sort_lists_in_dict(actual_service_entry)
+    expected_service_entry = _sort_lists_in_dict(expected_service_entry)
+
     assert expected_service_entry == actual_service_entry
 
 
@@ -302,6 +318,9 @@ def test_tcp_synapse_service_config(setup):
     with open('/etc/synapse/synapse.conf.json') as fd:
         synapse_config = json.load(fd)
     actual_service_entry = synapse_config['services'].get('service_one.main')
+
+    actual_service_entry = _sort_lists_in_dict(actual_service_entry)
+    expected_service_entry = _sort_lists_in_dict(expected_service_entry)
 
     assert expected_service_entry == actual_service_entry
 
