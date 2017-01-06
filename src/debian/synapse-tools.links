@@ -1,3 +1,3 @@
-usr/share/python/synapse-tools/bin/configure_synapse usr/bin/configure_synapse
-usr/share/python/synapse-tools/bin/haproxy_synapse_reaper usr/bin/haproxy_synapse_reaper
-usr/share/python/synapse-tools/bin/synapse_qdisc_tool usr/bin/synapse_qdisc_tool
+opt/venvs/synapse-tools/bin/configure_synapse usr/bin/configure_synapse
+opt/venvs/synapse-tools/bin/haproxy_synapse_reaper usr/bin/haproxy_synapse_reaper
+opt/venvs/synapse-tools/bin/synapse_qdisc_tool usr/bin/synapse_qdisc_tool

@@ -9,7 +9,7 @@ set -e
 apt-get -y install -f
 
 echo "Testing that pyyaml uses optimized cyaml parsers if present"
-/usr/share/python/synapse-tools/bin/python -c 'import yaml; assert yaml.__with_libyaml__'
+/opt/venvs/synapse-tools/bin/python -c 'import yaml; assert yaml.__with_libyaml__'
 
 echo "Creating directory for unix sockets"
 mkdir -p /var/run/synapse/sockets
