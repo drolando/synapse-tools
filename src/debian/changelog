@@ -1,3 +1,9 @@
+synapse-tools (0.11.4) lucid; urgency=medium
+
+  * Release 0.11.4
+
+ -- kwa <kwa@kwa-MacBookPro>  Tue, 10 Jan 2017 13:09:10 -0800
+
 synapse-tools (0.11.3) lucid; urgency=low
 
   * Expose a unix socket for each service
