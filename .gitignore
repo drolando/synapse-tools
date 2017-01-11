@@ -19,3 +19,4 @@ dockerfiles/itest/itest_trusty/
 src/debian/synapse-tools.postinst.debhelper
 src/.cache/
 bintray.json
+*.deb
