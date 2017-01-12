@@ -24,6 +24,8 @@ RUN tar -axvf /haproxy.tar.gz
 WORKDIR /haproxy-1.6.0
 RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
 
+# Pin for test reproducibility
+RUN gem install --no-ri --no-rdoc nokogiri -v 1.6.7.2
 RUN gem install --no-ri --no-rdoc synapse -v 0.13.8
 
 ADD synapse.conf /etc/init/synapse.conf
