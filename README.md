@@ -4,7 +4,7 @@ synapse-tools
 [![Build Status](https://travis-ci.org/Yelp/synapse-tools.svg?branch=master)](https://travis-ci.org/Yelp/synapse-tools)
 
 Tools for working with [synapse](https://github.com/airbnb/synapse).
-This repo builds as a [dh_virtualenv](https://github.com/spotify/dh_virtualenv) package, and provides three entry points:
+This repo builds as a [dh_virtualenv](https://github.com/spotify/dh-virtualenv) package, and provides three entry points:
 
 configure_synapse
 -----------------
