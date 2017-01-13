@@ -84,7 +84,7 @@ def generate_base_config(synapse_tools_config):
                 # Send syslog output to syslog2scribe
                 'log 127.0.0.1:1514 daemon info',
                 'log-send-hostname',
-                'unix-bind mode 777'
+                'unix-bind mode 666'
 
             ],
 
