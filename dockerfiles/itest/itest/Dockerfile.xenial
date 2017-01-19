@@ -2,14 +2,14 @@ FROM ubuntu:xenial
 MAINTAINER John Billings <billings@yelp.com>
 
 RUN apt-get update && apt-get -y install \
-	libcurl3 \
-	iptables \
-	python-setuptools \
-	python-pytest \
-	python-pycurl \
-	python-kazoo \
-	python-zope.interface \
-	python2.7 \
+    libcurl3 \
+    iptables \
+    python-setuptools \
+    python-pytest \
+    python-pycurl \
+    python-kazoo \
+    python-zope.interface \
+    python2.7 \
     ruby \
     ruby-dev \
     libxml2 \
