@@ -1,0 +1,45 @@
+FROM ubuntu:xenial
+MAINTAINER John Billings <billings@yelp.com>
+
+RUN apt-get update && apt-get -y install \
+	libcurl3 \
+	iptables \
+	python-setuptools \
+	python-pytest \
+	python-pycurl \
+	python-kazoo \
+	python-zope.interface \
+	python2.7 \
+    ruby \
+    ruby-dev \
+    libxml2 \
+    libxml2-dev \
+    libxslt-dev \
+    build-essential \
+    zlib1g-dev
+
+ADD https://github.com/haproxy/haproxy/archive/v1.6.0.tar.gz /haproxy.tar.gz
+RUN tar -axvf /haproxy.tar.gz
+WORKDIR /haproxy-1.6.0
+RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
+
+# Pin for test reproducibility
+RUN gem install --no-ri --no-rdoc nokogiri -v 1.6.7.2
+RUN gem install --no-ri --no-rdoc synapse -v 0.13.8
+
+ADD synapse.conf /etc/init/synapse.conf
+ADD synapse.conf.json /etc/synapse/synapse.conf.json
+ADD synapse-tools.conf.json /etc/synapse/synapse-tools.conf.json
+ADD yelpsoa-configs /nail/etc/services
+ADD zookeeper_discovery /nail/etc/zookeeper_discovery
+ADD habitat /nail/etc/habitat
+ADD ecosystem /nail/etc/ecosystem
+ADD region /nail/etc/region
+ADD itest.py /itest.py
+ADD run_itest.sh /run_itest.sh
+
+# configure_synapse tries to restart synapse.
+# make it think it succeeded.
+RUN ln -sf /bin/true /usr/sbin/service
+
+CMD /bin/bash /run_itest.sh
