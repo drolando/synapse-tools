@@ -9,6 +9,7 @@ synapse-tools*.dsc
 synapse-tools*.tar.gz
 src/.eggs
 src/build
+src/debian/debhelper-build-stamp
 src/debian/files
 src/debian/synapse-tools
 src/debian/synapse-tools.debhelper.log
@@ -16,6 +17,7 @@ src/debian/synapse-tools.substvars
 src/synapse_tools.egg-info
 dockerfiles/itest/itest_lucid/
 dockerfiles/itest/itest_trusty/
+dockerfiles/itest/itest_xenial/
 src/debian/synapse-tools.postinst.debhelper
 src/.cache/
 bintray.json

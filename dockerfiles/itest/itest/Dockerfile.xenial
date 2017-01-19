@@ -1,19 +1,31 @@
-FROM docker-dev.yelpcorp.com/lucid_yelp:latest
+FROM ubuntu:xenial
 MAINTAINER John Billings <billings@yelp.com>
 
 RUN apt-get update && apt-get -y install \
     libcurl3 \
     iptables \
-    haproxy-synapse \
     python-setuptools \
     python-pytest \
     python-pycurl \
     python-kazoo \
     python-zope.interface \
-    rbenv \
-    rbenv-ruby-1.9.3-p448 \
     python2.7 \
-    synapse
+    ruby \
+    ruby-dev \
+    libxml2 \
+    libxml2-dev \
+    libxslt-dev \
+    build-essential \
+    zlib1g-dev
+
+ADD https://github.com/haproxy/haproxy/archive/v1.6.0.tar.gz /haproxy.tar.gz
+RUN tar -axvf /haproxy.tar.gz
+WORKDIR /haproxy-1.6.0
+RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
+
+# Pin for test reproducibility
+RUN gem install --no-ri --no-rdoc nokogiri -v 1.6.7.2
+RUN gem install --no-ri --no-rdoc synapse -v 0.13.8
 
 ADD synapse.conf /etc/init/synapse.conf
 ADD synapse.conf.json /etc/synapse/synapse.conf.json
