@@ -169,7 +169,7 @@ def get_backend_name(service_name, discover_type, advertise_type):
         return '%s.%s' % (service_name, advertise_type)
 
 
-def generate_acls_for_service(service_name, discover_type, advertise_types):
+def generate_acls_for_service(service_name, discover_type, advertise_types, fronted_by):
     frontend_acl_configs = []
     for advertise_type in advertise_types:
         if compare_types(discover_type, advertise_type) < 0:
@@ -181,6 +181,22 @@ def generate_acls_for_service(service_name, discover_type, advertise_types):
             discover_type=discover_type,
             advertise_type=advertise_type,
         )
+
+        # check for fronted_by first, use_backend ordering matters
+        if fronted_by:
+            frontend_acl_configs.extend(
+                [
+                    'acl request_from_proxy hdr_beg(X-Yelp-Source) -i {fronted_by}'.format(
+                        fronted_by=fronted_by,
+                    ),
+                    'acl fronted_backend_has_connslots connslots({fronted_by}) gt 0'.format(
+                        fronted_by=fronted_by,
+                    ),
+                    'use_backend {fronted_by} if !request_from_proxy and fronted_backend_has_connslots'.format(
+                        fronted_by=fronted_by,
+                    )
+                ]
+            )
 
         # use connslots acl condition
         frontend_acl_configs.extend(
@@ -252,12 +268,15 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             synapse_config['services'][backend_identifier] = config
 
+        fronted_by = service_info.get('fronted_by')
+
         # populate the ACLs to route to the service backends
         synapse_config['services'][service_name]['haproxy']['frontend'].extend(
             generate_acls_for_service(
                 service_name=service_name,
                 discover_type=discover_type,
                 advertise_types=advertise_types,
+                fronted_by=fronted_by,
             )
         )
 
