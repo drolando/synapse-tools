@@ -186,7 +186,7 @@ def generate_acls_for_service(service_name, discover_type, advertise_types, fron
         if fronted_by:
             frontend_acl_configs.extend(
                 [
-                    'acl request_from_proxy hdr_beg(X-Yelp-Source) -i {fronted_by}'.format(
+                    'acl request_from_proxy hdr_beg(X-SmartStack-Fronted_by) -i {fronted_by}'.format(
                         fronted_by=fronted_by,
                     ),
                     'acl fronted_backend_has_connslots connslots({fronted_by}) gt 0'.format(

@@ -385,7 +385,7 @@ def test_generate_configuration_with_fronted_by(mock_get_current_location, mock_
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
-                    'acl request_from_proxy hdr_beg(X-Yelp-Source) -i spectre.main',
+                    'acl request_from_proxy hdr_beg(X-SmartStack-Fronted_by) -i spectre.main',
                     'acl fronted_backend_has_connslots connslots(spectre.main) gt 0',
                     'use_backend spectre.main if !request_from_proxy and fronted_backend_has_connslots',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
