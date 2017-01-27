@@ -320,7 +320,7 @@ def test_generate_configuration_empty(mock_available_location_types):
     assert actual_configuration == expected_configuration
 
 
-def test_generate_configuration_with_fronted_by(mock_get_current_location, mock_available_location_types):
+def test_generate_configuration_with_proxied_through(mock_get_current_location, mock_available_location_types):
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
         zookeeper_topology=['1.2.3.4', '2.3.4.5'],
@@ -342,7 +342,7 @@ def test_generate_configuration_with_fronted_by(mock_get_current_location, mock_
                     'balance': 'roundrobin',
                     'advertise': ['region'],
                     'discover': 'region',
-                    'fronted_by': 'spectre.main',
+                    'proxied_through': 'spectre.main',
                 }
             )
         ]
@@ -385,9 +385,9 @@ def test_generate_configuration_with_fronted_by(mock_get_current_location, mock_
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
-                    'acl request_from_proxy hdr_beg(X-SmartStack-Fronted_by) -i spectre.main',
-                    'acl fronted_backend_has_connslots connslots(spectre.main) gt 0',
-                    'use_backend spectre.main if !request_from_proxy and fronted_backend_has_connslots',
+                    'acl request_from_proxy hdr_beg(X-SmartStack-Proxied_through) -i spectre.main',
+                    'acl proxied_through_backend_has_connslots connslots(spectre.main) gt 0',
+                    'use_backend spectre.main if !request_from_proxy and proxied_through_backend_has_connslots',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                 ],
