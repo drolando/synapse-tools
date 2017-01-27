@@ -21,4 +21,7 @@ RUN apt-get update && apt-get -y install \
     dh-virtualenv \
     protobuf-compiler
 
+RUN pip install -U pip
+RUN pip install -U virtualenv
+
 WORKDIR /work
