@@ -171,6 +171,23 @@ def get_backend_name(service_name, discover_type, advertise_type):
 
 def generate_acls_for_service(service_name, discover_type, advertise_types, proxied_through):
     frontend_acl_configs = []
+
+    # check for proxied_through first, use_backend ordering matters
+    if proxied_through:
+        frontend_acl_configs.extend(
+            [
+                'acl request_from_proxy hdr_beg(X-SmartStack-Proxied_through) -i {proxied_through}'.format(
+                    proxied_through=proxied_through,
+                ),
+                'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
+                    proxied_through=proxied_through,
+                ),
+                'use_backend {proxied_through} if !request_from_proxy and proxied_through_backend_has_connslots'.format(
+                    proxied_through=proxied_through,
+                )
+            ]
+        )
+
     for advertise_type in advertise_types:
         if compare_types(discover_type, advertise_type) < 0:
             # don't create acls that downcast requests
@@ -181,22 +198,6 @@ def generate_acls_for_service(service_name, discover_type, advertise_types, prox
             discover_type=discover_type,
             advertise_type=advertise_type,
         )
-
-        # check for proxied_through first, use_backend ordering matters
-        if proxied_through:
-            frontend_acl_configs.extend(
-                [
-                    'acl request_from_proxy hdr_beg(X-SmartStack-Proxied_through) -i {proxied_through}'.format(
-                        proxied_through=proxied_through,
-                    ),
-                    'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
-                        proxied_through=proxied_through,
-                    ),
-                    'use_backend {proxied_through} if !request_from_proxy and proxied_through_backend_has_connslots'.format(
-                        proxied_through=proxied_through,
-                    )
-                ]
-            )
 
         # use connslots acl condition
         frontend_acl_configs.extend(
