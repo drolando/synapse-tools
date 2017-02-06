@@ -169,20 +169,28 @@ def get_backend_name(service_name, discover_type, advertise_type):
         return '%s.%s' % (service_name, advertise_type)
 
 
-def generate_acls_for_service(service_name, discover_type, advertise_types, proxied_through):
+def generate_acls_for_service(
+        service_name,
+        discover_type,
+        advertise_types,
+        proxied_through,
+        healthcheck_uri):
     frontend_acl_configs = []
 
     # check for proxied_through first, use_backend ordering matters
     if proxied_through:
         frontend_acl_configs.extend(
             [
+                'acl is_status_request path {healthcheck_uri}'.format(
+                    healthcheck_uri=healthcheck_uri,
+                ),
                 'acl request_from_proxy hdr_beg(X-SmartStack-Proxied_through) -i {proxied_through}'.format(
                     proxied_through=proxied_through,
                 ),
                 'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
                     proxied_through=proxied_through,
                 ),
-                'use_backend {proxied_through} if !request_from_proxy and proxied_through_backend_has_connslots'.format(
+                'use_backend {proxied_through} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
                     proxied_through=proxied_through,
                 )
             ]
@@ -270,6 +278,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             synapse_config['services'][backend_identifier] = config
 
         proxied_through = service_info.get('proxied_through')
+        healthcheck_uri = service_info.get('healthcheck_uri', '/status')
 
         # populate the ACLs to route to the service backends
         synapse_config['services'][service_name]['haproxy']['frontend'].extend(
@@ -278,6 +287,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 discover_type=discover_type,
                 advertise_types=advertise_types,
                 proxied_through=proxied_through,
+                healthcheck_uri=healthcheck_uri,
             )
         )
 
