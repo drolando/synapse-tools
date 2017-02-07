@@ -159,6 +159,31 @@ def generate_base_config(synapse_tools_config):
             }
         }
     }
+
+    # This allows us to add optional non-default error file directives; they
+    # should be a nested JSON object within the synapse-tools config of this
+    # sort:
+    # {
+    #   'errorfiles': {
+    #     '404': '/etc/haproxy-synapse/errors/404.http',
+    #     '503': '/etc/haproxy-synapse/errors/503.http'
+    #   }
+    # }
+    #
+    # This will add the following lines to the 'defaults' section of the
+    # haproxy config:
+    # errorfile 404 /etc/haproxy-synapse/errors/404.http
+    # errorfile 503 /etc/haproxy-synapse/errors/503.http
+    if synapse_tools_config['errorfiles']:
+        error_list = []
+        for error in synapse_tools_config['errorfiles']:
+            new_error = 'errorfile ' + error + ' ' + synapse_tools_config['errorfiles'][error]
+            error_list.append(new_error)
+
+
+        base_config['defaults'].extend(new_error)
+
+
     return base_config
 
 
