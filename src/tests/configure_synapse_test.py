@@ -342,7 +342,16 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                     'balance': 'roundrobin',
                     'advertise': ['region'],
                     'discover': 'region',
-                    'proxied_through': 'spectre.main',
+                    'proxied_through': 'proxy_service',
+                }
+            ),
+            (
+                'proxy_service',
+                {
+                    'proxy_port': 5678,
+                    'balance': 'roundrobin',
+                    'advertise': ['region'],
+                    'discover': 'region',
                 }
             )
         ]
@@ -352,6 +361,47 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
     )
     expected_configuration['services'] = {
+        'proxy_service': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/proxy_service',
+                'label_filters': [
+                    {
+                        'label': 'region:my_region',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/proxy_service/0/status',
+                    'http-check send-state',
+                    'balance roundrobin',
+                ],
+                'frontend': [
+                    'bind /var/run/synapse/sockets/proxy_service.sock',
+                    'capture request header X-B3-SpanId len 64',
+                    'capture request header X-B3-TraceId len 64',
+                    'capture request header X-B3-ParentSpanId len 64',
+                    'capture request header X-B3-Flags len 10',
+                    'capture request header X-B3-Sampled len 10',
+                    'option httplog',
+                    'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
+                    'use_backend proxy_service if proxy_service_has_connslots',
+                ],
+                'backend': [
+                    'acl is_status_request path /status',
+                    'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
+                ],
+                'port': '5678',
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'proxy_service',
+            },
+        },
         'test_service': {
             'default_servers': [],
             'use_previous_backends': False,
@@ -386,9 +436,10 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
                     'acl is_status_request path /status',
-                    'acl request_from_proxy hdr_beg(X-SmartStack-Proxied_through) -i spectre.main',
-                    'acl proxied_through_backend_has_connslots connslots(spectre.main) gt 0',
-                    'use_backend spectre.main if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
+                    'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i proxy_service',
+                    'acl proxied_through_backend_has_connslots connslots(proxy_service) gt 0',
+                    'use_backend proxy_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
+                    'reqadd X-Smartstack-Destination:\\ test_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                 ],
