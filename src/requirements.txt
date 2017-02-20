@@ -5,3 +5,4 @@ psutil==2.1.1
 PyYAML==3.11
 pyroute2==0.3.4
 paasta-tools==0.56.0
+setuptools==33.1.1

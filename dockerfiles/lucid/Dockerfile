@@ -9,7 +9,6 @@ RUN apt-get -y install \
     python-setuptools \
     python2.7 \
     python2.7-dev \
-    python-pkg-resources \
     debhelper \
     libyaml-dev \
     libcurl4-openssl-dev \
@@ -17,9 +16,5 @@ RUN apt-get -y install \
     libssl-dev \
     build-essential \
     dh-virtualenv
-
-RUN pip install -U pip
-RUN /usr/bin/update-alternatives --install /usr/bin/pip pip /usr/local/bin/pip 3
-RUN pip install -U tox
 
 WORKDIR /work
