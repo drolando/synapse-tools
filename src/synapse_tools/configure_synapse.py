@@ -169,8 +169,36 @@ def get_backend_name(service_name, discover_type, advertise_type):
         return '%s.%s' % (service_name, advertise_type)
 
 
-def generate_acls_for_service(service_name, discover_type, advertise_types):
+def generate_acls_for_service(
+        service_name,
+        discover_type,
+        advertise_types,
+        proxied_through,
+        healthcheck_uri):
     frontend_acl_configs = []
+
+    # check for proxied_through first, use_backend ordering matters
+    if proxied_through:
+        frontend_acl_configs.extend(
+            [
+                'acl is_status_request path {healthcheck_uri}'.format(
+                    healthcheck_uri=healthcheck_uri,
+                ),
+                'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i {proxied_through}'.format(
+                    proxied_through=proxied_through,
+                ),
+                'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
+                    proxied_through=proxied_through,
+                ),
+                'use_backend {proxied_through} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
+                    proxied_through=proxied_through,
+                ),
+                'reqadd X-Smartstack-Destination:\ {service_name} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
+                    service_name=service_name,
+                ),
+            ]
+        )
+
     for advertise_type in advertise_types:
         if compare_types(discover_type, advertise_type) < 0:
             # don't create acls that downcast requests
@@ -204,6 +232,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         for depth, loc in enumerate(available_locations)
     }
     available_locations = set(available_locations)
+    proxies = [service_info['proxied_through'] for _, service_info in services if service_info.get('proxied_through') is not None]
 
     for (service_name, service_info) in services:
         proxy_port = service_info.get('proxy_port')
@@ -229,6 +258,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             service_info=service_info,
             zookeeper_topology=zookeeper_topology,
             synapse_tools_config=synapse_tools_config,
+            is_proxy=service_name in proxies,
         )
 
         for advertise_type in advertise_types:
@@ -252,19 +282,24 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             synapse_config['services'][backend_identifier] = config
 
+        proxied_through = service_info.get('proxied_through')
+        healthcheck_uri = service_info.get('healthcheck_uri', '/status')
+
         # populate the ACLs to route to the service backends
         synapse_config['services'][service_name]['haproxy']['frontend'].extend(
             generate_acls_for_service(
                 service_name=service_name,
                 discover_type=discover_type,
                 advertise_types=advertise_types,
+                proxied_through=proxied_through,
+                healthcheck_uri=healthcheck_uri,
             )
         )
 
     return synapse_config
 
 
-def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config):
+def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config, is_proxy):
     # If the service sets one timeout but not the other, set both
     # as per haproxy best practices.
     default_timeout = max(
@@ -306,6 +341,18 @@ def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology,
 
     # backend options
     backend_options = []
+
+    if is_proxy:
+        backend_options.extend(
+            [
+                'acl is_status_request path {healthcheck_uri}'.format(
+                    healthcheck_uri=service_info.get('healthcheck_uri', '/status'),
+                ),
+                'reqadd X-Smartstack-Source:\ {service_name} if !is_status_request'.format(
+                    service_name=service_name,
+                ),
+            ]
+        )
 
     extra_headers = service_info.get('extra_headers', {})
     for header, value in extra_headers.iteritems():

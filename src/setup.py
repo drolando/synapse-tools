@@ -24,6 +24,7 @@ setup(
         'PyYAML>=3.11,<4.0.0',
         'pyroute2>=0.3.4,<0.4.0',
         'paasta-tools==0.56.0',
+        'setuptools<34',
     ],
     entry_points={
         'console_scripts': [

@@ -320,6 +320,143 @@ def test_generate_configuration_empty(mock_available_location_types):
     assert actual_configuration == expected_configuration
 
 
+def test_generate_configuration_with_proxied_through(mock_get_current_location, mock_available_location_types):
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            (
+                'test_service',
+                {
+                    'proxy_port': 1234,
+                    'healthcheck_uri': '/status',
+                    'retries': 2,
+                    'timeout_connect_ms': 2000,
+                    'timeout_server_ms': 3000,
+                    'extra_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'extra_healthcheck_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'balance': 'roundrobin',
+                    'advertise': ['region'],
+                    'discover': 'region',
+                    'proxied_through': 'proxy_service',
+                }
+            ),
+            (
+                'proxy_service',
+                {
+                    'proxy_port': 5678,
+                    'balance': 'roundrobin',
+                    'advertise': ['region'],
+                    'discover': 'region',
+                }
+            )
+        ]
+    )
+
+    expected_configuration = configure_synapse.generate_base_config(
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
+    )
+    expected_configuration['services'] = {
+        'proxy_service': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/proxy_service',
+                'label_filters': [
+                    {
+                        'label': 'region:my_region',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/proxy_service/0/status',
+                    'http-check send-state',
+                    'balance roundrobin',
+                ],
+                'frontend': [
+                    'bind /var/run/synapse/sockets/proxy_service.sock',
+                    'capture request header X-B3-SpanId len 64',
+                    'capture request header X-B3-TraceId len 64',
+                    'capture request header X-B3-ParentSpanId len 64',
+                    'capture request header X-B3-Flags len 10',
+                    'capture request header X-B3-Sampled len 10',
+                    'option httplog',
+                    'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
+                    'use_backend proxy_service if proxy_service_has_connslots',
+                ],
+                'backend': [
+                    'acl is_status_request path /status',
+                    'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
+                ],
+                'port': '5678',
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'proxy_service',
+            },
+        },
+        'test_service': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'region:my_region',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
+                    'balance roundrobin',
+                ],
+                'frontend': [
+                    'timeout client 3000ms',
+                    'bind /var/run/synapse/sockets/test_service.sock',
+                    'capture request header X-B3-SpanId len 64',
+                    'capture request header X-B3-TraceId len 64',
+                    'capture request header X-B3-ParentSpanId len 64',
+                    'capture request header X-B3-Flags len 10',
+                    'capture request header X-B3-Sampled len 10',
+                    'option httplog',
+                    'acl is_status_request path /status',
+                    'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i proxy_service',
+                    'acl proxied_through_backend_has_connslots connslots(proxy_service) gt 0',
+                    'use_backend proxy_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
+                    'reqadd X-Smartstack-Destination:\\ test_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
+                    'acl test_service_has_connslots connslots(test_service) gt 0',
+                    'use_backend test_service if test_service_has_connslots',
+                ],
+                'backend': [
+                    'reqidel ^X-Mode:.*',
+                    'reqadd X-Mode:\ ro',
+                ],
+                'port': '1234',
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'test_service',
+            },
+        },
+    }
+
+    assert actual_configuration == expected_configuration
+
+
 @contextlib.contextmanager
 def setup_mocks_for_main():
     mock_tmp_file = mock.MagicMock()
