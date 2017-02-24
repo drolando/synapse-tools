@@ -202,6 +202,54 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
     assert actual_configuration_reversed_advertise == expected_configuration
 
 
+def test_generate_configuration_with_errorfiles(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults(
+        {
+            'bind_addr': '0.0.0.0',
+            'haproxy.defaults.inter': '1234',
+            'errorfiles': {
+                '404': '/etc/haproxy-synapse/errors/404.http',
+                '503': '/etc/haproxy-synapse/errors/503.http',
+            }
+        }
+    )
+
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[]
+    )
+
+    actual_configuration_reversed_advertise = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[]
+    )
+
+    expected_configuration = configure_synapse.generate_base_config(
+        synapse_tools_config
+    )
+    expected_configuration['haproxy']['defaults'] = [
+        'timeout connect 200ms',
+        'timeout client 1000ms',
+        'timeout server 1000ms',
+        'retries 1',
+        'option redispatch',
+        'balance leastconn',
+        'mode http',
+        'option forceclose',
+        'option accept-invalid-http-request',
+        'log global',
+        'option log-separate-errors',
+        'default-server on-error fastinter error-limit 1 inter 1234 downinter 30s fastinter 30s rise 1 fall 2',
+        'errorfile 404 /etc/haproxy-synapse/errors/404.http',
+        'errorfile 503 /etc/haproxy-synapse/errors/503.http',
+    ]
+
+    assert actual_configuration == expected_configuration
+    assert actual_configuration_reversed_advertise == expected_configuration
+
+
 def test_generate_configuration_single_advertise(mock_get_current_location, mock_available_location_types):
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
