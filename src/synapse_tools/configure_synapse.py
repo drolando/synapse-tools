@@ -174,13 +174,11 @@ def generate_base_config(synapse_tools_config):
     # haproxy config:
     # errorfile 404 /etc/haproxy-synapse/errors/404.http
     # errorfile 503 /etc/haproxy-synapse/errors/503.http
-    if synapse_tools_config.get('errorfiles', False):
-        error_list = []
-        for error, errorfile in synapse_tools_config['errorfiles'].iteritems():
-            new_error = 'errorfile ' + error + ' ' + errorfile
-            error_list.append(new_error)
-
-        base_config['haproxy']['defaults'].extend(error_list)
+    error_list = [
+        "errorfile {} {}".format(error, errorfile)
+        for error, errorfile in synapse_tools_config.get('errorfiles', {}).iteritems()
+    ]
+    base_config['haproxy']['defaults'].extend(error_list)
 
     return base_config
 
