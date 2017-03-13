@@ -23,22 +23,50 @@ def get_config(synapse_tools_config_path):
 
 
 def set_defaults(config):
-    config.setdefault('haproxy.defaults.inter', '10m')
-    config.setdefault('file_output_path', '/var/run/synapse/services')
-    config.setdefault('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock')
-    config.setdefault('haproxy_config_path', '/var/run/synapse/haproxy.cfg')
-    config.setdefault('maximum_connections', 10000)
-    config.setdefault('maxconn_per_server', 50)
-    config.setdefault('maxqueue_per_server', 10)
-    config.setdefault('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock')
-    config.setdefault('synapse_restart_command', ['service', 'synapse', 'restart'])
-    config.setdefault('zookeeper_topology_path', '/nail/etc/zookeeper_discovery/infrastructure/local.yaml')
-    config.setdefault('haproxy_path', '/usr/bin/haproxy-synapse')
-    config.setdefault('haproxy_config_path', '/var/run/synapse/haproxy.cfg')
-    config.setdefault('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid')
-    config.setdefault('reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'""")
-    config.setdefault('hacheck_port', 6666)
-    config.setdefault('stats_port', 3212)
+    # Backwards compatibility for haproxy_reload_cmd_fmt
+    if 'reload_cmd_fmt' in config:
+        config['haproxy_reload_cmd_fmt'] = config['reload_cmd_fmt']
+
+    defaults = [
+        ('bind_addr', '0.0.0.0'),
+        # HAProxy related options
+        ('listen_with_haproxy', True),
+        ('haproxy.defaults.inter', '10m'),
+        ('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock'),
+        ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
+        ('haproxy_path', '/usr/bin/haproxy-synapse'),
+        ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
+        ('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid'),
+        ('haproxy_reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'"""),
+        ('haproxy_service_sockets_path_fmt',
+            '/var/run/synapse/sockets/{service_name}.sock'),
+        # Misc options
+        ('file_output_path', '/var/run/synapse/services'),
+        ('maximum_connections', 10000),
+        ('maxconn_per_server', 50),
+        ('maxqueue_per_server', 10),
+        ('synapse_restart_command', ['service', 'synapse', 'restart']),
+        ('zookeeper_topology_path',
+            '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'),
+        ('hacheck_port', 6666),
+        ('stats_port', 3212),
+        # NGINX related options
+        ('listen_with_nginx', False),
+        ('nginx_path', '/usr/bin/nginx-synapse'),
+        ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
+        ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
+        ('nginx_reload_cmd_fmt',
+            '{nginx_path} -s reload -c {nginx_config_path}'),
+        ('nginx_start_cmd_fmt',
+            'kill -0 $(cat {nginx_pid_file_path}) ||'
+            '{nginx_path} -c {nginx_config_path}'),
+        ('nginx_check_cmd_fmt',
+            '{nginx_path} -t -c {nginx_config_path}'),
+    ]
+
+    for k, v in defaults:
+        config.setdefault(k, v)
+
     return config
 
 
@@ -50,115 +78,151 @@ def get_zookeeper_topology(zookeeper_topology_path):
     return zookeeper_topology
 
 
+def _generate_nginx_top_level(synapse_tools_config):
+    return {
+        'contexts': {
+            'main': [
+                'worker_processes 1',
+                'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
+            ],
+            'events': [
+                'worker_connections 1024',
+            ],
+        },
+        'config_file_path': synapse_tools_config['nginx_config_path'],
+        'check_command': synapse_tools_config['nginx_check_cmd_fmt'].format(
+            **synapse_tools_config
+        ),
+        'reload_command': synapse_tools_config['nginx_reload_cmd_fmt'].format(
+            **synapse_tools_config
+        ),
+        'start_command': synapse_tools_config['nginx_start_cmd_fmt'].format(
+            **synapse_tools_config
+        ),
+        'do_writes': True,
+        'do_reloads': True,
+        'restart_interval': 60,
+        'restart_jitter': 0.1,
+        'listen_address': synapse_tools_config['bind_addr'],
+    }
+
+
+def _generate_haproxy_top_level(synapse_tools_config):
+    haproxy_inter = synapse_tools_config['haproxy.defaults.inter']
+    return {
+        'bind_address': synapse_tools_config['bind_addr'],
+        'restart_interval': 60,
+        'restart_jitter': 0.1,
+        'state_file_path': '/var/run/synapse/state.json',
+        'state_file_ttl': 30 * 60,
+        'reload_command': synapse_tools_config['haproxy_reload_cmd_fmt'].format(**synapse_tools_config),
+        'socket_file_path': synapse_tools_config['haproxy_socket_file_path'],
+        'config_file_path': synapse_tools_config['haproxy_config_path'],
+        'do_writes': True,
+        'do_reloads': True,
+        'do_socket': True,
+
+        'global': [
+            'daemon',
+            'maxconn %d' % synapse_tools_config['maximum_connections'],
+            'stats socket %s level admin' % synapse_tools_config['haproxy_socket_file_path'],
+
+            # Default of 16k is too small and causes HTTP 400 errors
+            'tune.bufsize 32768',
+
+            # Add random jitter to checks
+            'spread-checks 50',
+
+            # Send syslog output to syslog2scribe
+            'log 127.0.0.1:1514 daemon info',
+            'log-send-hostname',
+            'unix-bind mode 666'
+
+        ],
+
+        'defaults': [
+            # Various timeout values
+            'timeout connect 200ms',
+            'timeout client 1000ms',
+            'timeout server 1000ms',
+
+            # On failure, try a different server
+            'retries 1',
+            'option redispatch',
+
+            # The server with the lowest number of connections receives the
+            # connection
+            'balance leastconn',
+
+            # Assume it's an HTTP service
+            'mode http',
+
+            # Actively close connections to prevent old HAProxy instances
+            # from hanging around after restarts
+            'option forceclose',
+
+            # Sometimes our headers contain invalid characters which would
+            # otherwise cause HTTP 400 errors
+            'option accept-invalid-http-request',
+
+            # Use the global logging defaults
+            'log global',
+
+            # Log any abnormal connections at 'error' severity
+            'option log-separate-errors',
+
+            # Normally just check at <inter> period in order to minimize load
+            # on individual services.  However, if we get anything other than
+            # a 100 -- 499, 501 or 505 response code on user traffic then
+            # force <fastinter> check period.
+            #
+            # NOTES
+            #
+            # * This also requires 'check observe layer7' on the server
+            #   options.
+            # * When 'on-error' triggers a check, it will only occur after
+            #   <fastinter> delay.
+            # * Under the assumption of 100 client machines each
+            #   healthchecking a service instance:
+            #
+            #     10 minute <inter>     -> 0.2qps
+            #     30 second <downinter> -> 3.3qps
+            #     30 second <fastinter> -> 3.3qps
+            #
+            # * The <downinter> checks should only occur when Zookeeper is
+            #   down; ordinarily Nerve will quickly remove a backend if it
+            #   fails its local healthcheck.
+            # * The <fastinter> checks may occur when a service is generating
+            #   errors but is still passing its healthchecks.
+            ('default-server on-error fastinter error-limit 1'
+             ' inter {inter} downinter 30s fastinter 30s'
+             ' rise 1 fall 2'.format(inter=haproxy_inter)),
+        ],
+
+        'extra_sections': {
+            'listen stats': [
+                'bind :%d' % synapse_tools_config['stats_port'],
+                'mode http',
+                'stats enable',
+                'stats uri /',
+                'stats refresh 1m',
+                'stats show-node',
+            ]
+        }
+    }
+
+
 def generate_base_config(synapse_tools_config):
     synapse_tools_config = synapse_tools_config
-    haproxy_inter = synapse_tools_config['haproxy.defaults.inter']
     base_config = {
         # We'll fill this section in
         'services': {},
         'file_output': {'output_directory': synapse_tools_config['file_output_path']},
-        'haproxy': {
-            'bind_address': synapse_tools_config['bind_addr'],
-            'restart_interval': 60,
-            'restart_jitter': 0.1,
-            'state_file_path': '/var/run/synapse/state.json',
-            'state_file_ttl': 30 * 60,
-            'reload_command': synapse_tools_config['reload_cmd_fmt'].format(**synapse_tools_config),
-            'socket_file_path': synapse_tools_config['haproxy_socket_file_path'],
-            'config_file_path': synapse_tools_config['haproxy_config_path'],
-            'do_writes': True,
-            'do_reloads': True,
-            'do_socket': True,
-
-            'global': [
-                'daemon',
-                'maxconn %d' % synapse_tools_config['maximum_connections'],
-                'stats socket %s level admin' % synapse_tools_config['haproxy_socket_file_path'],
-
-                # Default of 16k is too small and causes HTTP 400 errors
-                'tune.bufsize 32768',
-
-                # Add random jitter to checks
-                'spread-checks 50',
-
-                # Send syslog output to syslog2scribe
-                'log 127.0.0.1:1514 daemon info',
-                'log-send-hostname',
-                'unix-bind mode 666'
-
-            ],
-
-            'defaults': [
-                # Various timeout values
-                'timeout connect 200ms',
-                'timeout client 1000ms',
-                'timeout server 1000ms',
-
-                # On failure, try a different server
-                'retries 1',
-                'option redispatch',
-
-                # The server with the lowest number of connections receives the
-                # connection
-                'balance leastconn',
-
-                # Assume it's an HTTP service
-                'mode http',
-
-                # Actively close connections to prevent old HAProxy instances
-                # from hanging around after restarts
-                'option forceclose',
-
-                # Sometimes our headers contain invalid characters which would
-                # otherwise cause HTTP 400 errors
-                'option accept-invalid-http-request',
-
-                # Use the global logging defaults
-                'log global',
-
-                # Log any abnormal connections at 'error' severity
-                'option log-separate-errors',
-
-                # Normally just check at <inter> period in order to minimize load
-                # on individual services.  However, if we get anything other than
-                # a 100 -- 499, 501 or 505 response code on user traffic then
-                # force <fastinter> check period.
-                #
-                # NOTES
-                #
-                # * This also requires 'check observe layer7' on the server
-                #   options.
-                # * When 'on-error' triggers a check, it will only occur after
-                #   <fastinter> delay.
-                # * Under the assumption of 100 client machines each
-                #   healthchecking a service instance:
-                #
-                #     10 minute <inter>     -> 0.2qps
-                #     30 second <downinter> -> 3.3qps
-                #     30 second <fastinter> -> 3.3qps
-                #
-                # * The <downinter> checks should only occur when Zookeeper is
-                #   down; ordinarily Nerve will quickly remove a backend if it
-                #   fails its local healthcheck.
-                # * The <fastinter> checks may occur when a service is generating
-                #   errors but is still passing its healthchecks.
-                ('default-server on-error fastinter error-limit 1'
-                 ' inter {inter} downinter 30s fastinter 30s'
-                 ' rise 1 fall 2'.format(inter=haproxy_inter)),
-            ],
-
-            'extra_sections': {
-                'listen stats': [
-                    'bind :%d' % synapse_tools_config['stats_port'],
-                    'mode http',
-                    'stats enable',
-                    'stats uri /',
-                    'stats refresh 1m',
-                    'stats show-node',
-                ]
-            }
-        }
+        'haproxy': _generate_haproxy_top_level(synapse_tools_config)
     }
+
+    if synapse_tools_config['listen_with_nginx']:
+        base_config['nginx'] = _generate_nginx_top_level(synapse_tools_config)
 
     # This allows us to add optional non-default error file directives; they
     # should be a nested JSON object within the synapse-tools config of this
@@ -190,6 +254,13 @@ def get_backend_name(service_name, discover_type, advertise_type):
         return '%s.%s' % (service_name, advertise_type)
 
 
+def _get_socket_path(synapse_tools_config, service_name):
+    socket_path = synapse_tools_config['haproxy_service_sockets_path_fmt'].format(
+        service_name=service_name
+    )
+    return socket_path
+
+
 def generate_acls_for_service(
         service_name,
         discover_type,
@@ -200,25 +271,23 @@ def generate_acls_for_service(
 
     # check for proxied_through first, use_backend ordering matters
     if proxied_through:
-        frontend_acl_configs.extend(
-            [
-                'acl is_status_request path {healthcheck_uri}'.format(
-                    healthcheck_uri=healthcheck_uri,
-                ),
-                'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i {proxied_through}'.format(
-                    proxied_through=proxied_through,
-                ),
-                'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
-                    proxied_through=proxied_through,
-                ),
-                'use_backend {proxied_through} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
-                    proxied_through=proxied_through,
-                ),
-                'reqadd X-Smartstack-Destination:\ {service_name} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
-                    service_name=service_name,
-                ),
-            ]
-        )
+        frontend_acl_configs.extend([
+            'acl is_status_request path {healthcheck_uri}'.format(
+                healthcheck_uri=healthcheck_uri,
+            ),
+            'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i {proxied_through}'.format(
+                proxied_through=proxied_through,
+            ),
+            'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
+                proxied_through=proxied_through,
+            ),
+            'use_backend {proxied_through} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
+                proxied_through=proxied_through,
+            ),
+            'reqadd X-Smartstack-Destination:\ {service_name} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
+                service_name=service_name,
+            ),
+        ])
 
     for advertise_type in advertise_types:
         if compare_types(discover_type, advertise_type) < 0:
@@ -253,12 +322,22 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         for depth, loc in enumerate(available_locations)
     }
     available_locations = set(available_locations)
-    proxies = [service_info['proxied_through'] for _, service_info in services if service_info.get('proxied_through') is not None]
+    proxies = [
+        service_info['proxied_through']
+        for _, service_info in services
+        if service_info.get('proxied_through') is not None
+    ]
 
     for (service_name, service_info) in services:
-        proxy_port = service_info.get('proxy_port')
-        if proxy_port is None:
+        proxy_port = service_info.get('proxy_port', -1)
+        # If we end up with the default value or a negative number in general,
+        # then we know that the service does not want to be in SmartStack at
+        # all
+        if proxy_port < 0:
             continue
+        # This is a "normal" service and should get a full entry
+        else:
+            pass
 
         discover_type = service_info.get('discover', 'region')
         advertise_types = sorted(
@@ -274,7 +353,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         if discover_type not in advertise_types:
             return {}
 
-        base_haproxy_cfg = base_haproxy_cfg_for_service(
+        base_watcher_cfg = base_watcher_cfg_for_service(
             service_name=service_name,
             service_info=service_info,
             zookeeper_topology=zookeeper_topology,
@@ -282,14 +361,36 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             is_proxy=service_name in proxies,
         )
 
+        socket_path = _get_socket_path(
+            synapse_tools_config, service_name
+        )
+
+
         for advertise_type in advertise_types:
-            config = copy.deepcopy(base_haproxy_cfg)
+            config = copy.deepcopy(base_watcher_cfg)
 
             backend_identifier = get_backend_name(service_name, discover_type, advertise_type)
 
             if advertise_type == discover_type:
                 # Specify a proxy port to create a frontend for this service
-                config['haproxy']['port'] = str(proxy_port)
+                if synapse_tools_config['listen_with_haproxy']:
+                    config['haproxy']['port'] = str(proxy_port)
+                    config['haproxy']['frontend'].append(
+                        'bind {0}'.format(socket_path)
+                    )
+                # If listen_with_haproxy is False, and we're only listening
+                # with nginx, then have the haproxy bind only to the socket
+                elif synapse_tools_config['listen_with_nginx']:
+                    config['haproxy']['port'] = None
+                    config['haproxy']['bind_address'] = _get_socket_path(
+                        synapse_tools_config, service_name
+                    )
+            else:
+                # The backend only watchers don't need listen or frontend
+                # because they have no listen port, so Synapse doens't
+                # generate a frontend section for them at all
+                del config['haproxy']['listen']
+                del config['haproxy']['frontend']
 
             config['discovery']['label_filters'] = [
                 {
@@ -317,12 +418,64 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             )
         )
 
+        # If nginx is supported, include a single static service watcher
+        # per service that listens on the right port and proxies back to the
+        # unix socket exposed by HAProxy
+        if synapse_tools_config['listen_with_nginx'] and proxy_port is not None:
+            listener_name = '{0}.nginx_listener'.format(service_name)
+            synapse_config['services'][listener_name] = (
+                _generate_nginx_for_watcher(
+                    service_name, service_info, synapse_tools_config
+                )
+            )
+
     return synapse_config
 
+def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config, is_proxy):
+    discovery = {
+        'method': 'zookeeper',
+        'path': '/smartstack/global/%s' % service_name,
+        'hosts': zookeeper_topology,
+    }
 
-def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config, is_proxy):
+    haproxy = _generate_haproxy_for_watcher(
+        service_name, service_info, synapse_tools_config, is_proxy
+    )
+
+    chaos = service_info.get('chaos')
+    if chaos:
+        frontend_chaos, discovery = chaos_options(chaos, discovery)
+        haproxy['frontend'].extend(frontend_chaos)
+
+    # Now write the actual synapse service entry
+    service = {
+        'default_servers': [],
+        # See SRV-1190
+        'use_previous_backends': False,
+        'discovery': discovery,
+        'haproxy': haproxy,
+   }
+
+    if synapse_tools_config['listen_with_nginx']:
+        # The dynamic service watchers do not want nginx to react to their
+        # changes
+        service['nginx'] = {
+            'disabled': True
+        }
+
+    return service
+
+
+def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config, is_proxy):
     # If the service sets one timeout but not the other, set both
     # as per haproxy best practices.
+    proxy_port = service_info.get('proxy_port', -1)
+
+    if synapse_tools_config['listen_with_nginx'] and proxy_port is None:
+        return {
+            'disabled': True
+        }
+
     default_timeout = max(
         service_info.get('timeout_client_ms'),
         service_info.get('timeout_server_ms')
@@ -347,8 +500,6 @@ def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology,
     )
     if timeout_client_ms is not None:
         frontend_options.append('timeout client %dms' % timeout_client_ms)
-
-    frontend_options.append('bind /var/run/synapse/sockets/%s.sock' % service_name)
 
     if mode == 'http':
         frontend_options.append('capture request header X-B3-SpanId len 64')
@@ -433,31 +584,50 @@ def base_haproxy_cfg_for_service(service_name, service_info, zookeeper_topology,
     if balance is not None and balance in ('leastconn', 'roundrobin'):
         listen_options.append('balance %s' % balance)
 
-    discovery = {
-        'method': 'zookeeper',
-        'path': '/smartstack/global/%s' % service_name,
-        'hosts': zookeeper_topology,
+    return {
+        'server_options': server_options,
+        'frontend': frontend_options,
+        'listen': listen_options,
+        'backend': backend_options,
     }
 
-    chaos = service_info.get('chaos')
-    if chaos:
-        frontend_chaos, discovery = chaos_options(chaos, discovery)
-        frontend_options.extend(frontend_chaos)
 
-    # Now write the actual synapse service entry
+def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config):
+    socket_path = _get_socket_path(synapse_tools_config, service_name)
+
+    # For the nginx listener, we just want the highest possible timeout
+    timeout = max(
+        service_info.get('timeout_client_ms'),
+        service_info.get('timeout_server_ms'),
+    )
+
+    server_options = []
+    if timeout is not None:
+        timeout = int(timeout)
+        # We always want HAProxy to throw the timeout, nginx just proxies it
+        timeout += 10
+        server_options.append('proxy_send_timeout {0}ms'.format(timeout))
+        server_options.append('proxy_read_timeout {0}ms'.format(timeout))
+
+    nginx_config = {
+        'port': service_info['proxy_port'],
+        'mode': service_info.get('mode', 'http'),
+        'server_option': server_options
+    }
     service = {
-        'default_servers': [],
-        # See SRV-1190
-        'use_previous_backends': False,
-        'discovery': discovery,
+        # The "None" port informs SmartStack this service has no port
+        'default_servers': [
+            {'host': socket_path, 'port': None}
+        ],
+        'use_previous_backends': True,
+        'discovery': {
+            'method': 'base'
+        },
         'haproxy': {
-            'server_options': server_options,
-            'frontend': frontend_options,
-            'listen': listen_options,
-            'backend': backend_options,
-        }
+            'disabled': True
+        },
+        'nginx': nginx_config
     }
-
     return service
 
 
@@ -519,10 +689,17 @@ def get_my_grouping(grouping_type):
 
 
 def main():
-    my_config = get_config(os.environ.get('SYNAPSE_TOOLS_CONFIG_PATH', '/etc/synapse/synapse-tools.conf.json'))
+    my_config = get_config(
+        os.environ.get(
+            'SYNAPSE_TOOLS_CONFIG_PATH', '/etc/synapse/synapse-tools.conf.json'
+        )
+    )
 
     new_synapse_config = generate_configuration(
-        my_config, get_zookeeper_topology(my_config['zookeeper_topology_path']), get_all_namespaces()
+        my_config,
+        get_zookeeper_topology(
+            my_config['zookeeper_topology_path']
+        ), get_all_namespaces()
     )
 
     with tempfile.NamedTemporaryFile() as tmp_file:
