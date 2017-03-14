@@ -356,6 +356,30 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
     assert actual_configuration_default_advertise == expected_configuration
 
 
+def test_generate_configuration_blacklist_region(mock_get_current_location, mock_available_location_types):
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            (
+                'test_service',
+                {
+                    'proxy_port': 1234,
+                    'healthcheck_uri': '/status',
+                    'blacklist_regions': [ 'my_region' ],
+                }
+            )
+        ]
+    )
+
+    expected_configuration = configure_synapse.generate_base_config(
+        synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'})
+    )
+    expected_configuration['services'] = {}
+
+    assert actual_configuration == expected_configuration
+
+
 def test_generate_configuration_empty(mock_available_location_types):
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),
