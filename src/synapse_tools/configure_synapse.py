@@ -260,6 +260,10 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         if proxy_port is None:
             continue
 
+        blacklist = service_info.get('blacklist_regions' [])
+        if get_current_location('region') in blacklist:
+            continue
+
         discover_type = service_info.get('discover', 'region')
         advertise_types = sorted(
             [
