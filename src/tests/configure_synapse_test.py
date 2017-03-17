@@ -133,13 +133,13 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                 ],
                 'frontend': [
                     'timeout client 3000ms',
-                    'bind /var/run/synapse/sockets/test_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
+                    'bind /var/run/synapse/sockets/test_service.sock',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                     'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
@@ -177,16 +177,6 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                     'timeout connect 2000ms',
                     'timeout server 3000ms',
                     'balance roundrobin',
-                ],
-                'frontend': [
-                    'timeout client 3000ms',
-                    'bind /var/run/synapse/sockets/test_service.sock',
-                    'capture request header X-B3-SpanId len 64',
-                    'capture request header X-B3-TraceId len 64',
-                    'capture request header X-B3-ParentSpanId len 64',
-                    'capture request header X-B3-Flags len 10',
-                    'capture request header X-B3-Sampled len 10',
-                    'option httplog',
                 ],
                 'backend': [
                     'reqidel ^X-Mode:.*',
@@ -305,13 +295,13 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
                 ],
                 'frontend': [
                     'timeout client 3000ms',
-                    'bind /var/run/synapse/sockets/test_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
+                    'bind /var/run/synapse/sockets/test_service.sock',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                 ],
@@ -405,13 +395,13 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                     'balance roundrobin',
                 ],
                 'frontend': [
-                    'bind /var/run/synapse/sockets/proxy_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
+                    'bind /var/run/synapse/sockets/proxy_service.sock',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
                 ],
@@ -450,13 +440,13 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                 ],
                 'frontend': [
                     'timeout client 3000ms',
-                    'bind /var/run/synapse/sockets/test_service.sock',
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
                     'capture request header X-B3-ParentSpanId len 64',
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
+                    'bind /var/run/synapse/sockets/test_service.sock',
                     'acl is_status_request path /status',
                     'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i proxy_service',
                     'acl proxied_through_backend_has_connslots connslots(proxy_service) gt 0',
@@ -473,6 +463,292 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
                 'backend_name': 'test_service',
             },
+        },
+    }
+
+    assert actual_configuration == expected_configuration
+
+
+def test_generate_configuration_with_nginx(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'bind_addr': '0.0.0.0',
+        'listen_with_nginx': True
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            (
+                'test_service',
+                {
+                    'proxy_port': 1234,
+                    'healthcheck_uri': '/status',
+                    'retries': 2,
+                    'timeout_connect_ms': 2000,
+                    'timeout_server_ms': 3000,
+                    'extra_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'extra_healthcheck_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'balance': 'roundrobin',
+                    'advertise': ['region', 'superregion'],
+                    'discover': 'region',
+                }
+            )
+        ]
+    )
+
+    expected_configuration = configure_synapse.generate_base_config(
+        synapse_tools_config=synapse_tools_config
+    )
+    expected_configuration['services'] = {
+        'test_service': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'region:my_region',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
+                    'balance roundrobin',
+                ],
+                'frontend': [
+                    'timeout client 3000ms',
+                    'capture request header X-B3-SpanId len 64',
+                    'capture request header X-B3-TraceId len 64',
+                    'capture request header X-B3-ParentSpanId len 64',
+                    'capture request header X-B3-Flags len 10',
+                    'capture request header X-B3-Sampled len 10',
+                    'option httplog',
+                    'bind /var/run/synapse/sockets/test_service.sock',
+                    'acl test_service_has_connslots connslots(test_service) gt 0',
+                    'use_backend test_service if test_service_has_connslots',
+                    'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
+                    'use_backend test_service.superregion if test_service.superregion_has_connslots',
+                ],
+                'backend': [
+                    'reqidel ^X-Mode:.*',
+                    'reqadd X-Mode:\ ro',
+                ],
+                'port': '1234',
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'test_service',
+            },
+            'nginx': {
+                'disabled': True
+            },
+        },
+        'test_service.superregion': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'superregion:my_superregion',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
+                    'balance roundrobin',
+                ],
+                'backend': [
+                    'reqidel ^X-Mode:.*',
+                    'reqadd X-Mode:\ ro',
+                ],
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'test_service.superregion',
+            },
+            'nginx': {
+                'disabled': True
+            },
+        },
+        'test_service.nginx_listener': {
+            'default_servers': [{
+                'host': 'unix',
+                'port': '/var/run/synapse/sockets/test_service.sock',
+            }],
+            'discovery': {'method': 'base'},
+            'haproxy': {'disabled': True},
+            'nginx': {
+                'mode': 'http',
+                'port': 1234,
+                'server_option': [
+                    'proxy_send_timeout 3010ms',
+                    'proxy_read_timeout 3010ms'
+                ],
+                'listen_options': 'reuseport',
+            },
+            'use_previous_backends': True
+        },
+    }
+
+    assert actual_configuration == expected_configuration
+
+
+def test_generate_configuration_only_nginx(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'bind_addr': '0.0.0.0',
+        'listen_with_nginx': True,
+        'listen_with_haproxy': False,
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            (
+                'test_service',
+                {
+                    'proxy_port': 1234,
+                    'healthcheck_uri': '/status',
+                    'retries': 2,
+                    'timeout_connect_ms': 2000,
+                    'timeout_server_ms': 3000,
+                    'extra_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'extra_healthcheck_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'balance': 'roundrobin',
+                    'advertise': ['region', 'superregion'],
+                    'discover': 'region',
+                }
+            )
+        ]
+    )
+
+    expected_configuration = configure_synapse.generate_base_config(
+        synapse_tools_config=synapse_tools_config
+    )
+    expected_configuration['services'] = {
+        'test_service': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'region:my_region',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
+                    'balance roundrobin',
+                ],
+                'frontend': [
+                    'timeout client 3000ms',
+                    'capture request header X-B3-SpanId len 64',
+                    'capture request header X-B3-TraceId len 64',
+                    'capture request header X-B3-ParentSpanId len 64',
+                    'capture request header X-B3-Flags len 10',
+                    'capture request header X-B3-Sampled len 10',
+                    'option httplog',
+                    'acl test_service_has_connslots connslots(test_service) gt 0',
+                    'use_backend test_service if test_service_has_connslots',
+                    'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
+                    'use_backend test_service.superregion if test_service.superregion_has_connslots',
+                ],
+                'backend': [
+                    'reqidel ^X-Mode:.*',
+                    'reqadd X-Mode:\ ro',
+                ],
+                'bind_address': '/var/run/synapse/sockets/test_service.sock',
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'test_service',
+                'port': None,
+            },
+            'nginx': {
+                'disabled': True
+            },
+        },
+        'test_service.superregion': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'superregion:my_superregion',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'listen': [
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
+                    'balance roundrobin',
+                ],
+                'backend': [
+                    'reqidel ^X-Mode:.*',
+                    'reqadd X-Mode:\ ro',
+                ],
+                'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
+                'backend_name': 'test_service.superregion',
+            },
+            'nginx': {
+                'disabled': True
+            },
+        },
+        'test_service.nginx_listener': {
+            'default_servers': [{
+                'host': 'unix',
+                'port': '/var/run/synapse/sockets/test_service.sock',
+            }],
+            'discovery': {'method': 'base'},
+            'haproxy': {'disabled': True},
+            'nginx': {
+                'mode': 'http',
+                'port': 1234,
+                'server_option': [
+                    'proxy_send_timeout 3010ms',
+                    'proxy_read_timeout 3010ms'
+                ]
+            },
+            'use_previous_backends': True
         },
     }
 

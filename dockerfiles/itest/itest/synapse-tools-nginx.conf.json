@@ -1,0 +1,8 @@
+{
+  "config_file": "/etc/synapse/synapse.conf.json",
+  "bind_addr": "0.0.0.0",
+  "stats_port": 32123,
+  "haproxy.defaults.inter": "10s",
+  "listen_with_haproxy": false,
+  "listen_with_nginx": true
+}

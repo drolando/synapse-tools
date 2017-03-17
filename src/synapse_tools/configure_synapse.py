@@ -52,13 +52,13 @@ def set_defaults(config):
         ('stats_port', 3212),
         # NGINX related options
         ('listen_with_nginx', False),
-        ('nginx_path', '/usr/bin/nginx-synapse'),
+        ('nginx_path', '/usr/sbin/nginx'),
         ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
         ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
         ('nginx_reload_cmd_fmt',
             '{nginx_path} -s reload -c {nginx_config_path}'),
         ('nginx_start_cmd_fmt',
-            'kill -0 $(cat {nginx_pid_file_path}) ||'
+            'kill -0 $(cat {nginx_pid_file_path}) || '
             '{nginx_path} -c {nginx_config_path}'),
         ('nginx_check_cmd_fmt',
             '{nginx_path} -t -c {nginx_config_path}'),
@@ -86,7 +86,9 @@ def _generate_nginx_top_level(synapse_tools_config):
                 'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
             ],
             'events': [
-                'worker_connections 1024',
+                'worker_connections {0}'.format(
+                    synapse_tools_config['maximum_connections']
+                ),
             ],
         },
         'config_file_path': synapse_tools_config['nginx_config_path'],
@@ -365,7 +367,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             synapse_tools_config, service_name
         )
 
-
         for advertise_type in advertise_types:
             config = copy.deepcopy(base_watcher_cfg)
 
@@ -386,10 +387,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                         synapse_tools_config, service_name
                     )
             else:
-                # The backend only watchers don't need listen or frontend
+                # The backend only watchers don't need frontend
                 # because they have no listen port, so Synapse doens't
                 # generate a frontend section for them at all
-                del config['haproxy']['listen']
                 del config['haproxy']['frontend']
 
             config['discovery']['label_filters'] = [
@@ -431,6 +431,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
     return synapse_config
 
+
 def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config, is_proxy):
     discovery = {
         'method': 'zookeeper',
@@ -454,7 +455,7 @@ def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology,
         'use_previous_backends': False,
         'discovery': discovery,
         'haproxy': haproxy,
-   }
+    }
 
     if synapse_tools_config['listen_with_nginx']:
         # The dynamic service watchers do not want nginx to react to their
@@ -614,10 +615,20 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
         'mode': service_info.get('mode', 'http'),
         'server_option': server_options
     }
+
+    # When both nginx and haproxy are listening on ports, nginx
+    # has to have the reuseport option enabled
+    both_listen = (
+        synapse_tools_config['listen_with_haproxy'] and
+        synapse_tools_config['listen_with_nginx']
+    )
+    if both_listen:
+        nginx_config['listen_options'] = 'reuseport'
+
     service = {
         # The "None" port informs SmartStack this service has no port
         'default_servers': [
-            {'host': socket_path, 'port': None}
+            {'host': 'unix', 'port': socket_path}
         ],
         'use_previous_backends': True,
         'discovery': {
@@ -720,3 +731,7 @@ def main():
 
         if should_restart:
             subprocess.check_call(my_config['synapse_restart_command'])
+
+
+if __name__ == '__main__':
+    main()

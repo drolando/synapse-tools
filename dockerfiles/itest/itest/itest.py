@@ -4,7 +4,6 @@ import json
 import os
 import socket
 import subprocess
-import tempfile
 import time
 import urllib2
 
@@ -71,16 +70,22 @@ SERVICES = {
 }
 
 # How long Synapse gets to configure HAProxy on startup.  This value is
-# intentionally generous to avoid any Jenkins flakes.
-SETUP_DELAY_S = 60
+# intentionally generous to avoid any build flakes.
+SETUP_DELAY_S = 30
 
 SOCKET_TIMEOUT = 10
 
 SYNAPSE_ROOT_DIR = '/var/run/synapse'
 
 
-@pytest.yield_fixture(scope="module")
-def setup():
+@pytest.yield_fixture(
+    scope='module',
+    params=[
+        '/etc/synapse/synapse-tools.conf.json',
+        '/etc/synapse/synapse-tools-both.conf.json',
+        '/etc/synapse/synapse-tools-nginx.conf.json',
+    ])
+def setup(request):
     try:
         os.makedirs(SYNAPSE_ROOT_DIR)
     except OSError:
@@ -111,14 +116,22 @@ def setup():
 
         # This is the tool that is installed by the synapse-tools package.
         # Run it to generate a new synapse configuration file.
-        subprocess.check_call(['configure_synapse'])
+        subprocess.check_call(
+            ['configure_synapse'],
+            env={
+                'SYNAPSE_TOOLS_CONFIG_PATH': request.param
+            }
+        )
 
         # Normally configure_synapse would start up synapse using 'service synapse start'.
         # However, this silently fails because we don't have an init process in our
         # Docker container.  So instead we manually start up synapse ourselves.
         synapse_process = subprocess.Popen(
             'synapse --config /etc/synapse/synapse.conf.json'.split(),
-            env={"PATH": "/opt/rbenv/bin:" + os.environ['PATH']})
+            env={
+                'PATH': '/opt/rbenv/bin:' + os.environ['PATH'],
+            }
+        )
 
         time.sleep(SETUP_DELAY_S)
 
@@ -138,6 +151,7 @@ def _sort_lists_in_dict(d):
         elif isinstance(d[k], list):
             d[k] = sorted(d[k])
     return d
+
 
 def test_haproxy_synapse_reaper(setup):
     # This should run with no errors.  Everything is running as root, so we need
@@ -247,16 +261,6 @@ def test_backup_http_synapse_service_config(setup):
                 'retries 2',
                 'timeout connect 10000ms',
                 'timeout server 11000ms'
-            ],
-            'frontend': [
-                'option httplog',
-                'timeout client 11000ms',
-                'capture request header X-B3-SpanId len 64',
-                'bind /var/run/synapse/sockets/service_three.main.sock',
-                'capture request header X-B3-TraceId len 64',
-                'capture request header X-B3-Flags len 10',
-                'capture request header X-B3-Sampled len 10',
-                'capture request header X-B3-ParentSpanId len 64',
             ],
             'backend': [
             ],
@@ -406,4 +410,3 @@ def test_http_service_returns_503(setup):
         with contextlib.closing(urllib2.urlopen(uri, timeout=SOCKET_TIMEOUT)):
             assert False
         assert excinfo.value.getcode() == 503
-
