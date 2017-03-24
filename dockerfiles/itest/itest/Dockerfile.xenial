@@ -27,7 +27,7 @@ RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
 # Pin for test reproducibility
 RUN gem install --no-ri --no-rdoc nokogiri -v 1.6.7.2
 RUN gem install --no-ri --no-rdoc synapse -v 0.14.1
-RUN gem install --no-ri --no-rdoc synapse-nginx -v 0.2.0
+RUN gem install --no-ri --no-rdoc synapse-nginx -v 0.2.2
 
 ADD synapse.conf /etc/init/synapse.conf
 ADD synapse.conf.json /etc/synapse/synapse.conf.json

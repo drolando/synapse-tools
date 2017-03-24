@@ -77,14 +77,21 @@ SOCKET_TIMEOUT = 10
 
 SYNAPSE_ROOT_DIR = '/var/run/synapse'
 
-
-@pytest.yield_fixture(
-    scope='module',
-    params=[
-        '/etc/synapse/synapse-tools.conf.json',
+SYNAPSE_TOOLS_CONFIGURATIONS = {
+    'haproxy': ['/etc/synapse/synapse-tools.conf.json'],
+    'nginx': [
         '/etc/synapse/synapse-tools-both.conf.json',
         '/etc/synapse/synapse-tools-nginx.conf.json',
-    ])
+    ]
+}
+
+YIELD_PARAMS = [
+    item for sublist in SYNAPSE_TOOLS_CONFIGURATIONS.values()
+    for item in sublist
+]
+
+
+@pytest.yield_fixture(scope='module', params=YIELD_PARAMS)
 def setup(request):
     try:
         os.makedirs(SYNAPSE_ROOT_DIR)
@@ -136,7 +143,7 @@ def setup(request):
         time.sleep(SETUP_DELAY_S)
 
         try:
-            yield
+            yield request.param
         finally:
             synapse_process.kill()
             synapse_process.wait()
@@ -178,6 +185,16 @@ def test_synapse_services(setup):
         synapse_config = json.load(fd)
     actual_services = synapse_config['services'].keys()
 
+    # nginx adds listener "services" which are noops
+    if setup in SYNAPSE_TOOLS_CONFIGURATIONS['nginx']:
+        nginx_services = [
+            'service_three_chaos.main.nginx_listener',
+            'service_one.main.nginx_listener',
+            'service_two.main.nginx_listener',
+            'service_three.main.nginx_listener',
+        ]
+        expected_services.extend(nginx_services)
+
     assert set(expected_services) == set(actual_services)
 
 
@@ -196,41 +213,20 @@ def test_http_synapse_service_config(setup):
                     'condition': 'equals',
                 },
             ],
-        },
-        'haproxy': {
-            'listen': [
-                'option httpchk GET /http/service_three.main/0/my_healthcheck_endpoint',
-                'http-check send-state',
-                'retries 2',
-                'timeout connect 10000ms',
-                'timeout server 11000ms'
-            ],
-            'frontend': [
-                'timeout client 11000ms',
-                'bind /var/run/synapse/sockets/service_three.main.sock',
-                'capture request header X-B3-SpanId len 64',
-                'capture request header X-B3-TraceId len 64',
-                'capture request header X-B3-ParentSpanId len 64',
-                'capture request header X-B3-Flags len 10',
-                'capture request header X-B3-Sampled len 10',
-                'option httplog',
-                'acl service_three.main_has_connslots connslots(service_three.main) gt 0',
-                'use_backend service_three.main if service_three.main_has_connslots',
-                'acl service_three.main.region_has_connslots connslots(service_three.main.region) gt 0',
-                'use_backend service_three.main.region if service_three.main.region_has_connslots',
-            ],
-            'backend': [
-            ],
-            'port': '20060',
-            'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
-            'backend_name': 'service_three.main',
-        },
-    }
+        }
+   }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
         synapse_config = json.load(fd)
 
     actual_service_entry = synapse_config['services'].get('service_three.main')
+
+    # Unit tests test the haproxy and nginx sections, itests just need
+    # to make sure it like ... exists
+    actual_haproxy_section = actual_service_entry['haproxy']
+    del actual_service_entry['haproxy']
+    if 'nginx' in actual_service_entry:
+        del actual_service_entry['nginx']
 
     actual_service_entry = _sort_lists_in_dict(actual_service_entry)
     expected_service_entry = _sort_lists_in_dict(expected_service_entry)
@@ -253,26 +249,20 @@ def test_backup_http_synapse_service_config(setup):
                     'condition': 'equals',
                 },
             ],
-        },
-        'haproxy': {
-            'listen': [
-                'option httpchk GET /http/service_three.main/0/my_healthcheck_endpoint',
-                'http-check send-state',
-                'retries 2',
-                'timeout connect 10000ms',
-                'timeout server 11000ms'
-            ],
-            'backend': [
-            ],
-            'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
-            'backend_name': 'service_three.main.region',
-        },
+        }
     }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
         synapse_config = json.load(fd)
 
     actual_service_entry = synapse_config['services'].get('service_three.main.region')
+
+    # Unit tests test the haproxy and nginx sections, itests just need
+    # to make sure it like ... exists
+    actual_haproxy_section = actual_service_entry['haproxy']
+    del actual_service_entry['haproxy']
+    if 'nginx' in actual_service_entry:
+        del actual_service_entry['nginx']
 
     actual_service_entry = _sort_lists_in_dict(actual_service_entry)
     expected_service_entry = _sort_lists_in_dict(expected_service_entry)
@@ -296,32 +286,18 @@ def test_tcp_synapse_service_config(setup):
                 },
             ],
         },
-        'haproxy': {
-            'listen': [
-                'option httpchk GET /tcp/service_one.main/0/status',
-                'http-check send-state',
-                'mode tcp',
-                'timeout connect 10000ms',
-                'timeout server 11000ms'
-            ],
-            'frontend': [
-                'timeout client 12000ms',
-                'bind /var/run/synapse/sockets/service_one.main.sock',
-                'option tcplog',
-                'acl service_one.main_has_connslots connslots(service_one.main) gt 0',
-                'use_backend service_one.main if service_one.main_has_connslots',
-            ],
-            'backend': [
-            ],
-            'port': '20028',
-            'server_options': 'check port 6666 observe layer4 maxconn 50 maxqueue 10',
-            'backend_name': 'service_one.main',
-        },
     }
 
     with open('/etc/synapse/synapse.conf.json') as fd:
         synapse_config = json.load(fd)
     actual_service_entry = synapse_config['services'].get('service_one.main')
+
+    # Unit tests test the haproxy and nginx sections, itests just need
+    # to make sure it like ... exists
+    actual_haproxy_section = actual_service_entry['haproxy']
+    del actual_service_entry['haproxy']
+    if 'nginx' in actual_service_entry:
+        del actual_service_entry['nginx']
 
     actual_service_entry = _sort_lists_in_dict(actual_service_entry)
     expected_service_entry = _sort_lists_in_dict(expected_service_entry)

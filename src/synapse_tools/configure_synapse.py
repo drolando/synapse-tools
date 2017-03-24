@@ -62,6 +62,7 @@ def set_defaults(config):
             '{nginx_path} -c {nginx_config_path}'),
         ('nginx_check_cmd_fmt',
             '{nginx_path} -t -c {nginx_config_path}'),
+        ('nginx_user_group', 'nobody nogroup'),
     ]
 
     for k, v in defaults:
@@ -84,6 +85,14 @@ def _generate_nginx_top_level(synapse_tools_config):
             'main': [
                 'worker_processes 1',
                 'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
+                'user {0}'.format(synapse_tools_config['nginx_user_group']),
+                'error_log /dev/null crit',
+            ],
+            'http': [
+                'access_log off',
+            ],
+            'stream': [
+                'access_log off',
             ],
             'events': [
                 'worker_connections {0}'.format(
