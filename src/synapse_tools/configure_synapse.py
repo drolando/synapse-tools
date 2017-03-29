@@ -91,9 +91,6 @@ def _generate_nginx_top_level(synapse_tools_config):
             'http': [
                 'access_log off',
             ],
-            'stream': [
-                'access_log off',
-            ],
             'events': [
                 'worker_connections {0}'.format(
                     synapse_tools_config['maximum_connections']

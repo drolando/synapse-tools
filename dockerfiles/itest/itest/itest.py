@@ -125,9 +125,9 @@ def setup(request):
         # Run it to generate a new synapse configuration file.
         subprocess.check_call(
             ['configure_synapse'],
-            env={
-                'SYNAPSE_TOOLS_CONFIG_PATH': request.param
-            }
+            env=dict(
+                os.environ, SYNAPSE_TOOLS_CONFIG_PATH=request.param
+            )
         )
 
         # Normally configure_synapse would start up synapse using 'service synapse start'.
