@@ -12,7 +12,13 @@ RUN apt-get update && apt-get -y install \
     libffi-dev \
     libssl-dev \
     build-essential \
-    dh-virtualenv \
-    protobuf-compiler
+    protobuf-compiler \
+    gdebi-core \
+    wget
+
+RUN cd /tmp && \
+    wget http://mirrors.kernel.org/ubuntu/pool/universe/d/dh-virtualenv/dh-virtualenv_1.0-1_all.deb && \
+    gdebi -n dh-virtualenv*.deb && \
+    rm dh-virtualenv_*.deb
 
 WORKDIR /work

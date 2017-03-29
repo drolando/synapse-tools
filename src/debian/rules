@@ -5,15 +5,6 @@ export DH_VIRTUALENV_INSTALL_ROOT=/opt/venvs
 
 export DH_OPTIONS
 
-LSBDISTRELEASE := $(shell lsb_release -sr)
-
-# https://github.com/spotify/dh-virtualenv/issues/150
-ifneq ($(LSBDISTRELEASE),10.04)
-  pip_args=--extra-pip-arg='--no-use-wheel'
-else
-  pip_args=
-endif
-
 %:
 	dh $@ --with python-virtualenv
 
@@ -29,4 +20,6 @@ override_dh_auto_test:
 	true
 
 override_dh_virtualenv:
-	dh_virtualenv --python=/usr/bin/python2.7 $(pip_args)
+	dh_virtualenv `host pypi.yelpcorp.com >/dev/null 2>&1 && echo '--extra-index-url https://pypi.yelpcorp.com/simple'` \
+	--python=/usr/bin/python2.7 --preinstall no-manylinux1 \
+	--preinstall pip-custom-platform --pip-tool pip-custom-platform
