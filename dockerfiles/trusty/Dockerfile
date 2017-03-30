@@ -19,6 +19,7 @@ RUN apt-get update && apt-get -y install \
     libssl-dev \
     build-essential \
     gdebi-core \
+    wget \
     protobuf-compiler
 
 RUN cd /tmp && \
