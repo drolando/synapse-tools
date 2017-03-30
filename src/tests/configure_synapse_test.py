@@ -870,3 +870,88 @@ def test_chaos_error_503(mock_get_current_location, mock_available_location_type
             ]
         )
         assert actual_configuration['services']['test_service']['discovery']['method'] == 'base'
+
+
+def test_discovery_only_services(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'bind_addr': '0.0.0.0',
+        'listen_with_nginx': True,
+        'listen_with_haproxy': True,
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            (
+                'test_service',
+                {
+                    'proxy_port': None,
+                    'healthcheck_uri': '/status',
+                    'retries': 2,
+                    'timeout_connect_ms': 2000,
+                    'timeout_server_ms': 3000,
+                    'extra_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'extra_healthcheck_headers': {
+                        'X-Mode': 'ro'
+                    },
+                    'balance': 'roundrobin',
+                    'advertise': ['region', 'superregion'],
+                    'discover': 'region',
+                }
+            )
+        ]
+    )
+
+    expected_configuration = configure_synapse.generate_base_config(
+        synapse_tools_config=synapse_tools_config
+    )
+    expected_configuration['services'] = {
+        'test_service': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'region:my_region',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'disabled': True
+            },
+            'nginx': {
+                'disabled': True
+            },
+        },
+        'test_service.superregion': {
+            'default_servers': [],
+            'use_previous_backends': False,
+            'discovery': {
+                'hosts': ['1.2.3.4', '2.3.4.5'],
+                'method': 'zookeeper',
+                'path': '/smartstack/global/test_service',
+                'label_filters': [
+                    {
+                        'label': 'superregion:my_superregion',
+                        'value': '',
+                        'condition': 'equals',
+                    },
+                ],
+            },
+            'haproxy': {
+                'disabled': True
+            },
+            'nginx': {
+                'disabled': True
+            },
+        },
+    }
+
+    assert actual_configuration == expected_configuration

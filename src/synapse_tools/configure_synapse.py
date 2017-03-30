@@ -339,13 +339,12 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
     for (service_name, service_info) in services:
         proxy_port = service_info.get('proxy_port', -1)
         # If we end up with the default value or a negative number in general,
-        # then we know that the service does not want to be in SmartStack at
-        # all
-        if proxy_port < 0:
+        # then we know that the service does not want to be in SmartStack
+        if proxy_port is not None and proxy_port < 0:
             continue
-        # This is a "normal" service and should get a full entry
-        else:
-            pass
+        # Note that at this point proxy_port can be:
+        # * valid number: Wants Load balancing (HAProxy/Nginx)
+        # * None: Wants discovery, but no load balancing (files)
 
         discover_type = service_info.get('discover', 'region')
         advertise_types = sorted(
@@ -374,29 +373,10 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         )
 
         for advertise_type in advertise_types:
+            backend_identifier = get_backend_name(
+                service_name, discover_type, advertise_type
+            )
             config = copy.deepcopy(base_watcher_cfg)
-
-            backend_identifier = get_backend_name(service_name, discover_type, advertise_type)
-
-            if advertise_type == discover_type:
-                # Specify a proxy port to create a frontend for this service
-                if synapse_tools_config['listen_with_haproxy']:
-                    config['haproxy']['port'] = str(proxy_port)
-                    config['haproxy']['frontend'].append(
-                        'bind {0}'.format(socket_path)
-                    )
-                # If listen_with_haproxy is False, and we're only listening
-                # with nginx, then have the haproxy bind only to the socket
-                elif synapse_tools_config['listen_with_nginx']:
-                    config['haproxy']['port'] = None
-                    config['haproxy']['bind_address'] = _get_socket_path(
-                        synapse_tools_config, service_name
-                    )
-            else:
-                # The backend only watchers don't need frontend
-                # because they have no listen port, so Synapse doens't
-                # generate a frontend section for them at all
-                del config['haproxy']['frontend']
 
             config['discovery']['label_filters'] = [
                 {
@@ -406,34 +386,59 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 },
             ]
 
-            config['haproxy']['backend_name'] = backend_identifier
+            if proxy_port is None:
+                config['haproxy'] = {'disabled': True}
+                if synapse_tools_config['listen_with_nginx']:
+                    config['nginx'] = {'disabled': True}
+            else:
+                if advertise_type == discover_type:
+                    # Specify a proxy port to create a frontend for this service
+                    if synapse_tools_config['listen_with_haproxy']:
+                        config['haproxy']['port'] = str(proxy_port)
+                        config['haproxy']['frontend'].append(
+                            'bind {0}'.format(socket_path)
+                        )
+                    # If listen_with_haproxy is False, and we're only listening
+                    # with nginx, then have the haproxy bind only to the socket
+                    elif synapse_tools_config['listen_with_nginx']:
+                        config['haproxy']['port'] = None
+                        config['haproxy']['bind_address'] = _get_socket_path(
+                            synapse_tools_config, service_name
+                        )
+                else:
+                    # The backend only watchers don't need frontend
+                    # because they have no listen port, so Synapse doens't
+                    # generate a frontend section for them at all
+                    del config['haproxy']['frontend']
+                config['haproxy']['backend_name'] = backend_identifier
 
             synapse_config['services'][backend_identifier] = config
 
-        proxied_through = service_info.get('proxied_through')
-        healthcheck_uri = service_info.get('healthcheck_uri', '/status')
+        if proxy_port is not None:
+            proxied_through = service_info.get('proxied_through')
+            healthcheck_uri = service_info.get('healthcheck_uri', '/status')
 
-        # populate the ACLs to route to the service backends
-        synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-            generate_acls_for_service(
-                service_name=service_name,
-                discover_type=discover_type,
-                advertise_types=advertise_types,
-                proxied_through=proxied_through,
-                healthcheck_uri=healthcheck_uri,
-            )
-        )
-
-        # If nginx is supported, include a single static service watcher
-        # per service that listens on the right port and proxies back to the
-        # unix socket exposed by HAProxy
-        if synapse_tools_config['listen_with_nginx'] and proxy_port is not None:
-            listener_name = '{0}.nginx_listener'.format(service_name)
-            synapse_config['services'][listener_name] = (
-                _generate_nginx_for_watcher(
-                    service_name, service_info, synapse_tools_config
+            # populate the ACLs to route to the service backends
+            synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                generate_acls_for_service(
+                    service_name=service_name,
+                    discover_type=discover_type,
+                    advertise_types=advertise_types,
+                    proxied_through=proxied_through,
+                    healthcheck_uri=healthcheck_uri,
                 )
             )
+
+            # If nginx is supported, include a single additional static
+            # service watcher per service that listens on the right port and
+            # proxies back to the unix socket exposed by HAProxy
+            if synapse_tools_config['listen_with_nginx']:
+                listener_name = '{0}.nginx_listener'.format(service_name)
+                synapse_config['services'][listener_name] = (
+                    _generate_nginx_for_watcher(
+                        service_name, service_info, synapse_tools_config
+                    )
+                )
 
     return synapse_config
 
@@ -476,13 +481,6 @@ def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology,
 def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config, is_proxy):
     # If the service sets one timeout but not the other, set both
     # as per haproxy best practices.
-    proxy_port = service_info.get('proxy_port', -1)
-
-    if synapse_tools_config['listen_with_nginx'] and proxy_port is None:
-        return {
-            'disabled': True
-        }
-
     default_timeout = max(
         service_info.get('timeout_client_ms'),
         service_info.get('timeout_server_ms')
@@ -623,7 +621,9 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     }
 
     # When both nginx and haproxy are listening on ports, nginx
-    # has to have the reuseport option enabled
+    # has to have the reuseport option enabled. However with just nginx
+    # we want this **OFF** because otherwise nginx reloads are not hitless
+    # on Linux < 4.4
     both_listen = (
         synapse_tools_config['listen_with_haproxy'] and
         synapse_tools_config['listen_with_nginx']
