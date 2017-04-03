@@ -599,7 +599,7 @@ def test_generate_configuration_with_nginx(mock_get_current_location, mock_avail
             'nginx': {
                 'mode': 'http',
                 'port': 1234,
-                'server_option': [
+                'server': [
                     'proxy_send_timeout 3010ms',
                     'proxy_read_timeout 3010ms'
                 ],
@@ -743,7 +743,7 @@ def test_generate_configuration_only_nginx(mock_get_current_location, mock_avail
             'nginx': {
                 'mode': 'http',
                 'port': 1234,
-                'server_option': [
+                'server': [
                     'proxy_send_timeout 3010ms',
                     'proxy_read_timeout 3010ms'
                 ]

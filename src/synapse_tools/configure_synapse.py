@@ -53,13 +53,14 @@ def set_defaults(config):
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
+        ('nginx_prefix', '/var/run/synapse/nginx_temp'),
         ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
         ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
         ('nginx_reload_cmd_fmt',
-            '{nginx_path} -s reload -c {nginx_config_path}'),
+            '{nginx_path} -s reload -c {nginx_config_path} -p {nginx_prefix}'),
         ('nginx_start_cmd_fmt',
-            'kill -0 $(cat {nginx_pid_file_path}) || '
-            '{nginx_path} -c {nginx_config_path}'),
+            'mkdir -p {nginx_prefix} && (kill -0 $(cat {nginx_pid_file_path}) || '
+            '{nginx_path} -c {nginx_config_path} -p {nginx_prefix})'),
         ('nginx_check_cmd_fmt',
             '{nginx_path} -t -c {nginx_config_path}'),
         ('nginx_user_group', 'nobody nogroup'),
@@ -84,17 +85,25 @@ def _generate_nginx_top_level(synapse_tools_config):
         'contexts': {
             'main': [
                 'worker_processes 1',
+                'worker_rlimit_nofile {0}'.format(
+                    int(synapse_tools_config['maximum_connections']) * 4
+                ),
                 'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
                 'user {0}'.format(synapse_tools_config['nginx_user_group']),
                 'error_log /dev/null crit',
             ],
             'http': [
                 'access_log off',
+                'sendfile on',
+                'tcp_nopush on',
+                'tcp_nodelay on',
             ],
             'events': [
                 'worker_connections {0}'.format(
                     synapse_tools_config['maximum_connections']
                 ),
+                'multi_accept on',
+                'use epoll',
             ],
         },
         'config_file_path': synapse_tools_config['nginx_config_path'],
@@ -606,18 +615,24 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
         service_info.get('timeout_server_ms'),
     )
 
-    server_options = []
+    mode = service_info.get('mode', 'http')
+
+    server = []
     if timeout is not None:
         timeout = int(timeout)
         # We always want HAProxy to throw the timeout, nginx just proxies it
         timeout += 10
-        server_options.append('proxy_send_timeout {0}ms'.format(timeout))
-        server_options.append('proxy_read_timeout {0}ms'.format(timeout))
+
+        if mode == 'tcp':
+            server.append('proxy_timeout {0}ms'.format(timeout))
+        elif mode == 'http':
+            server.append('proxy_send_timeout {0}ms'.format(timeout))
+            server.append('proxy_read_timeout {0}ms'.format(timeout))
 
     nginx_config = {
         'port': service_info['proxy_port'],
-        'mode': service_info.get('mode', 'http'),
-        'server_option': server_options
+        'mode': mode,
+        'server': server,
     }
 
     # When both nginx and haproxy are listening on ports, nginx
