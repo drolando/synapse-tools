@@ -185,7 +185,8 @@ def test_synapse_services(setup):
         synapse_config = json.load(fd)
     actual_services = synapse_config['services'].keys()
 
-    # nginx adds listener "services" which are noops
+    # nginx adds listener "services" which contain the proxy
+    # back to HAProxy sockets which actually do the load balancing
     if setup in SYNAPSE_TOOLS_CONFIGURATIONS['nginx']:
         nginx_services = [
             'service_three_chaos.main.nginx_listener',
@@ -221,11 +222,14 @@ def test_http_synapse_service_config(setup):
 
     actual_service_entry = synapse_config['services'].get('service_three.main')
 
-    # Unit tests test the haproxy and nginx sections, itests just need
-    # to make sure it like ... exists
-    actual_haproxy_section = actual_service_entry['haproxy']
+    # Unit tests already test the contents of the haproxy and nginx sections
+    # itests operate at a higher level of abstraction and need not care about
+    # how exactly SmartStack achieves the goal of load balancing
+    # So, we just check that the sections are there, but not what's in them!
+    assert 'haproxy' in actual_service_entry
     del actual_service_entry['haproxy']
-    if 'nginx' in actual_service_entry:
+    if setup in SYNAPSE_TOOLS_CONFIGURATIONS['nginx']:
+        assert 'nginx' in actual_service_entry
         del actual_service_entry['nginx']
 
     actual_service_entry = _sort_lists_in_dict(actual_service_entry)
@@ -257,11 +261,14 @@ def test_backup_http_synapse_service_config(setup):
 
     actual_service_entry = synapse_config['services'].get('service_three.main.region')
 
-    # Unit tests test the haproxy and nginx sections, itests just need
-    # to make sure it like ... exists
-    actual_haproxy_section = actual_service_entry['haproxy']
+    # Unit tests already test the contents of the haproxy and nginx sections
+    # itests operate at a higher level of abstraction and need not care about
+    # how exactly SmartStack achieves the goal of load balancing
+    # So, we just check that the sections are there, but not what's in them!
+    assert 'haproxy' in actual_service_entry
     del actual_service_entry['haproxy']
-    if 'nginx' in actual_service_entry:
+    if setup in SYNAPSE_TOOLS_CONFIGURATIONS['nginx']:
+        assert 'nginx' in actual_service_entry
         del actual_service_entry['nginx']
 
     actual_service_entry = _sort_lists_in_dict(actual_service_entry)
@@ -292,11 +299,14 @@ def test_tcp_synapse_service_config(setup):
         synapse_config = json.load(fd)
     actual_service_entry = synapse_config['services'].get('service_one.main')
 
-    # Unit tests test the haproxy and nginx sections, itests just need
-    # to make sure it like ... exists
-    actual_haproxy_section = actual_service_entry['haproxy']
+    # Unit tests already test the contents of the haproxy and nginx sections
+    # itests operate at a higher level of abstraction and need not care about
+    # how exactly SmartStack achieves the goal of load balancing
+    # So, we just check that the sections are there, but not what's in them!
+    assert 'haproxy' in actual_service_entry
     del actual_service_entry['haproxy']
-    if 'nginx' in actual_service_entry:
+    if setup in SYNAPSE_TOOLS_CONFIGURATIONS['nginx']:
+        assert 'nginx' in actual_service_entry
         del actual_service_entry['nginx']
 
     actual_service_entry = _sort_lists_in_dict(actual_service_entry)
