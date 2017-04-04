@@ -407,9 +407,11 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                         config['haproxy']['frontend'].append(
                             'bind {0}'.format(socket_path)
                         )
-                    # If listen_with_haproxy is False, and we're only listening
-                    # with nginx, then have the haproxy bind only to the socket
-                    elif synapse_tools_config['listen_with_nginx']:
+                    # If listen_with_haproxy is False, then have
+                    # HAProxy bind only to the socket. Nginx may or may not
+                    # be listening on ports based on listen_with_nginx values
+                    # at this stage.
+                    else:
                         config['haproxy']['port'] = None
                         config['haproxy']['bind_address'] = _get_socket_path(
                             synapse_tools_config, service_name
