@@ -14,6 +14,7 @@ from environment_tools.type_utils import available_location_types
 from environment_tools.type_utils import compare_types
 from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
+from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
 
 
@@ -57,13 +58,14 @@ def set_defaults(config):
         ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
         ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
         ('nginx_reload_cmd_fmt',
-            '{nginx_path} -s reload -c {nginx_config_path} -p {nginx_prefix}'),
+            'kill -USR2 $(cat ${nginx_pid_file_path}) && sleep 2 && '
+            'kill -WINCH $(cat ${nginx_pid_file_path}.oldbin) && '
+            'kill -QUIT $(cat ${nginx_pid_file_path}.oldbin)'),
         ('nginx_start_cmd_fmt',
             'mkdir -p {nginx_prefix} && (kill -0 $(cat {nginx_pid_file_path}) || '
             '{nginx_path} -c {nginx_config_path} -p {nginx_prefix})'),
         ('nginx_check_cmd_fmt',
-            '{nginx_path} -t -c {nginx_config_path}'),
-        ('nginx_user_group', 'nobody nogroup'),
+            '{nginx_path} -t -c {nginx_config_path}')
     ]
 
     for k, v in defaults:
@@ -89,7 +91,6 @@ def _generate_nginx_top_level(synapse_tools_config):
                     int(synapse_tools_config['maximum_connections']) * 4
                 ),
                 'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
-                'user {0}'.format(synapse_tools_config['nginx_user_group']),
                 'error_log /dev/null crit',
             ],
             'http': [
@@ -97,6 +98,8 @@ def _generate_nginx_top_level(synapse_tools_config):
                 'sendfile on',
                 'tcp_nopush on',
                 'tcp_nodelay on',
+                'server_tokens off',
+                'proxy_pass_header Server',
             ],
             'events': [
                 'worker_connections {0}'.format(
@@ -118,7 +121,10 @@ def _generate_nginx_top_level(synapse_tools_config):
         ),
         'do_writes': True,
         'do_reloads': True,
-        'restart_interval': 60,
+        # Only has to restart for adding or removing new listeners (aka services)
+        # This should be relatively rare so we crank up the restart_interval
+        # to limit memory consumption.
+        'restart_interval': 600,
         'restart_jitter': 0.1,
         'listen_address': synapse_tools_config['bind_addr'],
     }
@@ -611,25 +617,19 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
 def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config):
     socket_path = _get_socket_path(synapse_tools_config, service_name)
 
-    # For the nginx listener, we just want the highest possible timeout
-    timeout = max(
-        service_info.get('timeout_client_ms'),
-        service_info.get('timeout_server_ms'),
-    )
+    # For the nginx listener, we just want the highest possible timeout.
+    # To limit restarts we set this to the max reap age (so HAProxy will
+    # always time out the connection, not NGINX).
+    timeout = int(DEFAULT_REAP_AGE_S)
+    server = []
 
     mode = service_info.get('mode', 'http')
 
-    server = []
-    if timeout is not None:
-        timeout = int(timeout)
-        # We always want HAProxy to throw the timeout, nginx just proxies it
-        timeout += 10
-
-        if mode == 'tcp':
-            server.append('proxy_timeout {0}ms'.format(timeout))
-        elif mode == 'http':
-            server.append('proxy_send_timeout {0}ms'.format(timeout))
-            server.append('proxy_read_timeout {0}ms'.format(timeout))
+    if mode == 'tcp':
+        server.append('proxy_timeout {0}s'.format(timeout))
+    elif mode == 'http':
+        server.append('proxy_send_timeout {0}s'.format(timeout))
+        server.append('proxy_read_timeout {0}s'.format(timeout))
 
     nginx_config = {
         'port': service_info['proxy_port'],
