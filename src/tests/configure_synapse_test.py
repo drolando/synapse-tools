@@ -600,8 +600,8 @@ def test_generate_configuration_with_nginx(mock_get_current_location, mock_avail
                 'mode': 'http',
                 'port': 1234,
                 'server': [
-                    'proxy_send_timeout 3010ms',
-                    'proxy_read_timeout 3010ms'
+                    'proxy_send_timeout 3610s',
+                    'proxy_read_timeout 3610s'
                 ],
                 'listen_options': 'reuseport',
             },
@@ -744,8 +744,8 @@ def test_generate_configuration_only_nginx(mock_get_current_location, mock_avail
                 'mode': 'http',
                 'port': 1234,
                 'server': [
-                    'proxy_send_timeout 3010ms',
-                    'proxy_read_timeout 3010ms'
+                    'proxy_send_timeout 3610s',
+                    'proxy_read_timeout 3610s'
                 ]
             },
             'use_previous_backends': True

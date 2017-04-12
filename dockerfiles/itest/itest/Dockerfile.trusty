@@ -39,8 +39,8 @@ RUN ./configure \
     --http-log-path=/var/log/nginx/access.log \
     --pid-path=/var/run/nginx.pid \
     --lock-path=/var/run/nginx.lock \
-    --user=nginx \
-    --group=nginx \
+    --user=nobody \
+    --group=nogroup \
     --with-http_ssl_module \
     --with-stream \
     --without-http_rewrite_module \
