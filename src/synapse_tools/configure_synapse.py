@@ -57,6 +57,8 @@ def set_defaults(config):
         ('nginx_prefix', '/var/run/synapse/nginx_temp'),
         ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
         ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
+        # http://nginx.org/en/docs/control.html#upgrade
+        # This is apparently how you gracefully reload the binary ...
         ('nginx_reload_cmd_fmt',
             'kill -USR2 $(cat ${nginx_pid_file_path}) && sleep 2 && '
             'kill -WINCH $(cat ${nginx_pid_file_path}.oldbin) && '
@@ -618,9 +620,10 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     socket_path = _get_socket_path(synapse_tools_config, service_name)
 
     # For the nginx listener, we just want the highest possible timeout.
-    # To limit restarts we set this to the max reap age (so HAProxy will
-    # always time out the connection, not NGINX).
-    timeout = int(DEFAULT_REAP_AGE_S)
+    # To limit memory usage we set this to the max reap age (so HAProxy will
+    # always time out the connection, not NGINX). We add an epsilon of 10
+    # just to really really make sure that HAProxy does the error codes
+    timeout = int(DEFAULT_REAP_AGE_S) + 10
     server = []
 
     mode = service_info.get('mode', 'http')
