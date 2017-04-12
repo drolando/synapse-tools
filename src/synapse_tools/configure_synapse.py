@@ -533,6 +533,7 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         frontend_options.append('capture request header X-B3-Sampled len 10')
         frontend_options.append('option httplog')
     elif mode == 'tcp':
+        frontend_options.append('no option accept-invalid-http-request')
         frontend_options.append('option tcplog')
 
     # backend options
