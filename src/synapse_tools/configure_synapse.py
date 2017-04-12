@@ -60,9 +60,9 @@ def set_defaults(config):
         # http://nginx.org/en/docs/control.html#upgrade
         # This is apparently how you gracefully reload the binary ...
         ('nginx_reload_cmd_fmt',
-            'kill -USR2 $(cat ${nginx_pid_file_path}) && sleep 2 && '
-            'kill -WINCH $(cat ${nginx_pid_file_path}.oldbin) && '
-            'kill -QUIT $(cat ${nginx_pid_file_path}.oldbin)'),
+            'kill -USR2 $(cat {nginx_pid_file_path}) && sleep 2 && '
+            'kill -WINCH $(cat {nginx_pid_file_path}.oldbin) && '
+            'kill -QUIT $(cat {nginx_pid_file_path}.oldbin)'),
         ('nginx_start_cmd_fmt',
             'mkdir -p {nginx_prefix} && (kill -0 $(cat {nginx_pid_file_path}) || '
             '{nginx_path} -c {nginx_config_path} -p {nginx_prefix})'),
