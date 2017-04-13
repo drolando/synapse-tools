@@ -596,6 +596,7 @@ def test_generate_configuration_with_nginx(mock_get_current_location, mock_avail
             }],
             'discovery': {'method': 'base'},
             'haproxy': {'disabled': True},
+            'file_output': {'disabled': True},
             'nginx': {
                 'mode': 'http',
                 'port': 1234,
@@ -740,6 +741,7 @@ def test_generate_configuration_only_nginx(mock_get_current_location, mock_avail
             }],
             'discovery': {'method': 'base'},
             'haproxy': {'disabled': True},
+            'file_output': {'disabled': True},
             'nginx': {
                 'mode': 'http',
                 'port': 1234,
