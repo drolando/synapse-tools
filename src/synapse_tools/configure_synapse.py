@@ -653,7 +653,6 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
         nginx_config['listen_options'] = 'reuseport'
 
     service = {
-        # The "None" port informs SmartStack this service has no port
         'default_servers': [
             {'host': 'unix', 'port': socket_path}
         ],
@@ -662,6 +661,9 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
             'method': 'base'
         },
         'haproxy': {
+            'disabled': True
+        },
+        'file_output': {
             'disabled': True
         },
         'nginx': nginx_config
