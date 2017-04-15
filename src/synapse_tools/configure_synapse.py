@@ -41,6 +41,7 @@ def set_defaults(config):
         ('haproxy_reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'"""),
         ('haproxy_service_sockets_path_fmt',
             '/var/run/synapse/sockets/{service_name}.sock'),
+        ('haproxy_restart_interval_s', 60),
         # Misc options
         ('file_output_path', '/var/run/synapse/services'),
         ('maximum_connections', 10000),
@@ -67,7 +68,11 @@ def set_defaults(config):
             'mkdir -p {nginx_prefix} && (kill -0 $(cat {nginx_pid_file_path}) || '
             '{nginx_path} -c {nginx_config_path} -p {nginx_prefix})'),
         ('nginx_check_cmd_fmt',
-            '{nginx_path} -t -c {nginx_config_path}')
+            '{nginx_path} -t -c {nginx_config_path}'),
+        # Nginx only has to restart for adding or removing new listeners
+        # (aka services) This should be relatively rare so we crank up the
+        # restart_interval to limit memory consumption.
+        ('nginx_restart_interval_s', 600),
     ]
 
     for k, v in defaults:
@@ -105,14 +110,21 @@ def _generate_nginx_top_level(synapse_tools_config):
                 'server_tokens off',
                 'proxy_pass_header Server',
                 'proxy_pass_header Connection',
+                'proxy_pass_header Date',
                 # By default nginx will overwrite your Host and Connection
                 # headers, this breaks things so we turn it off
+                # Also for proper websocket support we can't strip the Upgrade
+                # header either...
                 'proxy_set_header Host $http_host',
                 'proxy_set_header Connection $http_connection',
+                'proxy_set_header Upgrade $http_upgrade',
                 # We don't have variable speed clients, don't buffer things
+                # Also set buffer sizes to 16k like HAProxy does
                 'proxy_buffering off',
+                'proxy_buffer_size 16k',
+                'proxy_buffers 4 16k',
                 'proxy_request_buffering off',
-                'client_max_body_size 0',
+                'proxy_max_temp_file_size 0',
                 'proxy_http_version 1.1',
                 'proxy_redirect off',
                 # If the client sends bad headers, so be it, proxy them
@@ -140,10 +152,7 @@ def _generate_nginx_top_level(synapse_tools_config):
         ),
         'do_writes': True,
         'do_reloads': True,
-        # Only has to restart for adding or removing new listeners (aka services)
-        # This should be relatively rare so we crank up the restart_interval
-        # to limit memory consumption.
-        'restart_interval': 600,
+        'restart_interval': synapse_tools_config['nginx_restart_interval_s'],
         'restart_jitter': 0.1,
         'listen_address': synapse_tools_config['bind_addr'],
     }
@@ -153,7 +162,7 @@ def _generate_haproxy_top_level(synapse_tools_config):
     haproxy_inter = synapse_tools_config['haproxy.defaults.inter']
     return {
         'bind_address': synapse_tools_config['bind_addr'],
-        'restart_interval': 60,
+        'restart_interval': synapse_tools_config['haproxy_restart_interval_s'],
         'restart_jitter': 0.1,
         'state_file_path': '/var/run/synapse/state.json',
         'state_file_ttl': 30 * 60,
