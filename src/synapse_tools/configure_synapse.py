@@ -100,8 +100,25 @@ def _generate_nginx_top_level(synapse_tools_config):
                 'sendfile on',
                 'tcp_nopush on',
                 'tcp_nodelay on',
+                # Fix silly nginx header defaults, we're a proxy, don't
+                # fudge with the traffic!
                 'server_tokens off',
                 'proxy_pass_header Server',
+                'proxy_pass_header Connection',
+                # By default nginx will overwrite your Host and Connection
+                # headers, this breaks things so we turn it off
+                'proxy_set_header Host $http_host',
+                'proxy_set_header Connection $http_connection',
+                # We don't have variable speed clients, don't buffer things
+                'proxy_buffering off',
+                'proxy_request_buffering off',
+                'client_max_body_size 0',
+                'proxy_http_version 1.1',
+                'proxy_redirect off',
+                # If the client sends bad headers, so be it, proxy them
+                # faithfully
+                'ignore_invalid_headers off',
+                'underscores_in_headers on',
             ],
             'events': [
                 'worker_connections {0}'.format(
