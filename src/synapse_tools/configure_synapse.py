@@ -41,6 +41,7 @@ def set_defaults(config):
         ('haproxy_reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'"""),
         ('haproxy_service_sockets_path_fmt',
             '/var/run/synapse/sockets/{service_name}.sock'),
+        ('haproxy_restart_interval_s', 60),
         # Misc options
         ('file_output_path', '/var/run/synapse/services'),
         ('maximum_connections', 10000),
@@ -67,7 +68,11 @@ def set_defaults(config):
             'mkdir -p {nginx_prefix} && (kill -0 $(cat {nginx_pid_file_path}) || '
             '{nginx_path} -c {nginx_config_path} -p {nginx_prefix})'),
         ('nginx_check_cmd_fmt',
-            '{nginx_path} -t -c {nginx_config_path}')
+            '{nginx_path} -t -c {nginx_config_path}'),
+        # Nginx only has to restart for adding or removing new listeners
+        # (aka services) This should be relatively rare so we crank up the
+        # restart_interval to limit memory consumption.
+        ('nginx_restart_interval_s', 600),
     ]
 
     for k, v in defaults:
@@ -95,13 +100,8 @@ def _generate_nginx_top_level(synapse_tools_config):
                 'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
                 'error_log /dev/null crit',
             ],
-            'http': [
-                'access_log off',
-                'sendfile on',
-                'tcp_nopush on',
-                'tcp_nodelay on',
-                'server_tokens off',
-                'proxy_pass_header Server',
+            'stream': [
+                'tcp_nodelay on'
             ],
             'events': [
                 'worker_connections {0}'.format(
@@ -123,10 +123,7 @@ def _generate_nginx_top_level(synapse_tools_config):
         ),
         'do_writes': True,
         'do_reloads': True,
-        # Only has to restart for adding or removing new listeners (aka services)
-        # This should be relatively rare so we crank up the restart_interval
-        # to limit memory consumption.
-        'restart_interval': 600,
+        'restart_interval': synapse_tools_config['nginx_restart_interval_s'],
         'restart_jitter': 0.1,
         'listen_address': synapse_tools_config['bind_addr'],
     }
@@ -136,7 +133,7 @@ def _generate_haproxy_top_level(synapse_tools_config):
     haproxy_inter = synapse_tools_config['haproxy.defaults.inter']
     return {
         'bind_address': synapse_tools_config['bind_addr'],
-        'restart_interval': 60,
+        'restart_interval': synapse_tools_config['haproxy_restart_interval_s'],
         'restart_jitter': 0.1,
         'state_file_path': '/var/run/synapse/state.json',
         'state_file_ttl': 30 * 60,
@@ -625,19 +622,13 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     # always time out the connection, not NGINX). We add an epsilon of 10
     # just to really really make sure that HAProxy does the error codes
     timeout = int(DEFAULT_REAP_AGE_S) + 10
-    server = []
+    server = ['proxy_timeout {0}s'.format(timeout)]
 
-    mode = service_info.get('mode', 'http')
-
-    if mode == 'tcp':
-        server.append('proxy_timeout {0}s'.format(timeout))
-    elif mode == 'http':
-        server.append('proxy_send_timeout {0}s'.format(timeout))
-        server.append('proxy_read_timeout {0}s'.format(timeout))
-
+    # All we want from nginx is TCP termination, no http even for
+    # http services. HAProxy is responsible for all layer7 choices
     nginx_config = {
+        'mode': 'tcp',
         'port': service_info['proxy_port'],
-        'mode': mode,
         'server': server,
     }
 

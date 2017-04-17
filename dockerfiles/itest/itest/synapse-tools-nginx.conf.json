@@ -4,5 +4,7 @@
   "stats_port": 32123,
   "haproxy.defaults.inter": "10s",
   "listen_with_haproxy": false,
-  "listen_with_nginx": true
+  "listen_with_nginx": true,
+  "haproxy_restart_interval_s": 2,
+  "nginx_restart_interval_s": 2
 }
