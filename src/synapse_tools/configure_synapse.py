@@ -100,37 +100,8 @@ def _generate_nginx_top_level(synapse_tools_config):
                 'pid {0}'.format(synapse_tools_config['nginx_pid_file_path']),
                 'error_log /dev/null crit',
             ],
-            'http': [
-                'access_log off',
-                'sendfile on',
-                'tcp_nopush on',
-                'tcp_nodelay on',
-                # Fix silly nginx header defaults, we're a proxy, don't
-                # fudge with the traffic!
-                'server_tokens off',
-                'proxy_pass_header Server',
-                'proxy_pass_header Connection',
-                'proxy_pass_header Date',
-                # By default nginx will overwrite your Host and Connection
-                # headers, this breaks things so we turn it off
-                # Also for proper websocket support we can't strip the Upgrade
-                # header either...
-                'proxy_set_header Host $http_host',
-                'proxy_set_header Connection $http_connection',
-                'proxy_set_header Upgrade $http_upgrade',
-                # We don't have variable speed clients, don't buffer things
-                # Also set buffer sizes to 16k like HAProxy does
-                'proxy_buffering off',
-                'proxy_buffer_size 16k',
-                'proxy_buffers 4 16k',
-                'proxy_request_buffering off',
-                'proxy_max_temp_file_size 0',
-                'proxy_http_version 1.1',
-                'proxy_redirect off',
-                # If the client sends bad headers, so be it, proxy them
-                # faithfully
-                'ignore_invalid_headers off',
-                'underscores_in_headers on',
+            'stream': [
+                'tcp_nodelay on'
             ],
             'events': [
                 'worker_connections {0}'.format(
@@ -651,19 +622,13 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     # always time out the connection, not NGINX). We add an epsilon of 10
     # just to really really make sure that HAProxy does the error codes
     timeout = int(DEFAULT_REAP_AGE_S) + 10
-    server = []
+    server = ['proxy_timeout {0}s'.format(timeout)]
 
-    mode = service_info.get('mode', 'http')
-
-    if mode == 'tcp':
-        server.append('proxy_timeout {0}s'.format(timeout))
-    elif mode == 'http':
-        server.append('proxy_send_timeout {0}s'.format(timeout))
-        server.append('proxy_read_timeout {0}s'.format(timeout))
-
+    # All we want from nginx is TCP termination, no http even for
+    # http services. HAProxy is responsible for all layer7 choices
     nginx_config = {
+        'mode': 'tcp',
         'port': service_info['proxy_port'],
-        'mode': mode,
         'server': server,
     }
 
