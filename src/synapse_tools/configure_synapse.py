@@ -449,6 +449,12 @@ def get_my_grouping(grouping_type):
     with open('/nail/etc/{0}'.format(grouping_type)) as fd:
         return fd.read().strip()
 
+def ensure_directory_exists(path):
+    try:
+        os.makedirs(path)
+    except OSError:
+        if not os.path.isdir(path):
+            raise
 
 def main():
     my_config = get_config(os.environ.get('SYNAPSE_TOOLS_CONFIG_PATH', '/etc/synapse/synapse-tools.conf.json'))
@@ -456,6 +462,8 @@ def main():
     new_synapse_config = generate_configuration(
         my_config, get_zookeeper_topology(my_config['zookeeper_topology_path']), get_all_namespaces()
     )
+
+    ensure_directory_exists('/var/run/synapse/sockets')
 
     with tempfile.NamedTemporaryFile() as tmp_file:
         new_synapse_config_path = tmp_file.name
