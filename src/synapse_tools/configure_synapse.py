@@ -173,7 +173,7 @@ def _generate_haproxy_top_level(synapse_tools_config):
             'option redispatch',
 
             # The server with the lowest number of connections receives the
-            # connection
+            # connection by default
             'balance leastconn',
 
             # Assume it's an HTTP service
@@ -495,6 +495,9 @@ def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology,
 
 
 def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config, is_proxy):
+    # Note that validations of all the following config options are done in
+    # config post-receive so invalid config should never get here
+
     # If the service sets one timeout but not the other, set both
     # as per haproxy best practices.
     default_timeout = max(
@@ -503,6 +506,7 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     )
 
     # Server options
+    # Things that get appended to each server line in HAProxy
     mode = service_info.get('mode', 'http')
     if mode == 'http':
         server_options = 'check port %d observe layer7 maxconn %d maxqueue %d'
@@ -515,6 +519,7 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     )
 
     # Frontend options
+    # All things related to the listen socket on HAProxy
     frontend_options = []
     timeout_client_ms = service_info.get(
         'timeout_client_ms', default_timeout
@@ -533,8 +538,23 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         frontend_options.append('no option accept-invalid-http-request')
         frontend_options.append('option tcplog')
 
-    # backend options
+    # Backend options
+    # All things related to load balancing to backend servers
     backend_options = []
+
+    balance = service_info.get('balance')
+    if balance is not None and balance in ('leastconn', 'roundrobin'):
+        backend_options.append('balance %s' % balance)
+
+    keepalive = service_info.get('keepalive', False):
+    if keepalive and mode == 'http':
+        backend_options.extend([
+            'no option forceclose',
+            'option http-keep-alive'
+        ]
+
+    if mode == 'tcp':
+        backend_options.append('mode tcp')
 
     if is_proxy:
         backend_options.extend(
@@ -554,9 +574,6 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     for header, value in extra_headers.iteritems():
         backend_options.append('reqadd %s:\ %s' % (header, value))
 
-    # Listen options
-    listen_options = []
-
     # hacheck healthchecking
     # Note that we use a dummy port value of '0' here because HAProxy is
     # passing in the real port using the X-Haproxy-Server-State header.
@@ -575,42 +592,39 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         (mode, service_name, port, healthcheck_uri.lstrip('/'), headers_string)
 
     healthcheck_string = healthcheck_string.strip()
-    listen_options.append(healthcheck_string)
+    backend_options.append(healthcheck_string)
 
-    listen_options.append('http-check send-state')
-
-    if mode == 'tcp':
-        listen_options.append('mode tcp')
+    backend_options.append('http-check send-state')
 
     retries = service_info.get('retries')
     if retries is not None:
-        listen_options.append('retries %d' % retries)
+        backend_options.append('retries %d' % retries)
 
     allredisp = service_info.get('allredisp')
     if allredisp is not None and allredisp:
-        listen_options.append('option allredisp')
-
-    timeout_connect_ms = service_info.get('timeout_connect_ms')
-    if timeout_connect_ms is not None:
-        listen_options.append('timeout connect %dms' % timeout_connect_ms)
+        backend_options.append('option allredisp')
 
     timeout_server_ms = service_info.get(
         'timeout_server_ms', default_timeout
     )
     if timeout_server_ms is not None:
-        listen_options.append('timeout server %dms' % timeout_server_ms)
+        backend_options.append('timeout server %dms' % timeout_server_ms)
 
-    balance = service_info.get('balance')
-    # Validations are done in config post-receive so invalid config should
-    # be ignored
-    if balance is not None and balance in ('leastconn', 'roundrobin'):
-        listen_options.append('balance %s' % balance)
+    timeout_connect_ms = service_info.get('timeout_connect_ms')
+
+    if timeout_connect_ms is not None:
+        backend_options.append('timeout connect %dms' % timeout_connect_ms)
 
     return {
         'server_options': server_options,
         'frontend': frontend_options,
-        'listen': listen_options,
         'backend': backend_options,
+        # We don't actually want to use listen, it's confusing and unclear
+        # what is happening (e.g. these directives are not actually going
+        # into HAProxy listen sections, instead Synapse is automatically
+        # routing them to backend or frontend based on its understanding
+        # of HAProxy's options ... let's just do that ourselves)
+        'listen': [],
     }
 
 
