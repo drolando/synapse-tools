@@ -562,7 +562,7 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     if balance is not None and balance in ('leastconn', 'roundrobin'):
         backend_options.append('balance %s' % balance)
 
-    keepalive = service_info.get('keepalive', False):
+    keepalive = service_info.get('keepalive', False)
     if keepalive and mode == 'http':
         backend_options.extend([
             'no option forceclose',
@@ -620,16 +620,16 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     if allredisp is not None and allredisp:
         backend_options.append('option allredisp')
 
+    timeout_connect_ms = service_info.get('timeout_connect_ms')
+
+    if timeout_connect_ms is not None:
+        backend_options.append('timeout connect %dms' % timeout_connect_ms)
+
     timeout_server_ms = service_info.get(
         'timeout_server_ms', default_timeout
     )
     if timeout_server_ms is not None:
         backend_options.append('timeout server %dms' % timeout_server_ms)
-
-    timeout_connect_ms = service_info.get('timeout_connect_ms')
-
-    if timeout_connect_ms is not None:
-        backend_options.append('timeout connect %dms' % timeout_connect_ms)
 
     return {
         'server_options': server_options,
