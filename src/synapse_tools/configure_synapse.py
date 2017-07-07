@@ -39,6 +39,7 @@ def set_defaults(config):
         ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
         ('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid'),
         ('haproxy_state_file_path', None),
+        ('haproxy_respect_allredisp', True),
         ('haproxy_reload_cmd_fmt', """touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID"""),
         ('haproxy_service_sockets_path_fmt',
             '/var/run/synapse/sockets/{service_name}.sock'),
@@ -172,7 +173,7 @@ def _generate_haproxy_top_level(synapse_tools_config):
             'timeout server 1000ms',
 
             # On failure, try a different server
-            'retries 2',
+            'retries 1',
             'option redispatch 1',
 
             # The server with the lowest number of connections receives the
@@ -619,9 +620,11 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     if retries is not None:
         backend_options.append('retries %d' % retries)
 
-    allredisp = service_info.get('allredisp')
-    if allredisp is not None and allredisp:
-        backend_options.append('option allredisp')
+    # Once we are on 1.7, we can remove this entirely
+    if synapse_tools_config['haproxy_respect_allredisp']:
+        allredisp = service_info.get('allredisp')
+        if allredisp is not None and allredisp:
+            backend_options.append('option allredisp')
 
     timeout_connect_ms = service_info.get('timeout_connect_ms')
 
