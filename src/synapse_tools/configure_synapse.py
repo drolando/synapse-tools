@@ -535,7 +535,8 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     )
 
     # Frontend options
-    # All things related to the listen socket on HAProxy
+    # All things related to the listening sockets on HAProxy
+    # These are what clients connect to
     frontend_options = []
     timeout_client_ms = service_info.get(
         'timeout_client_ms', default_timeout
@@ -570,6 +571,8 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         ])
 
     if mode == 'tcp':
+        # We need to put the frontend and backend into tcp mode
+        frontend_options.append('mode tcp')
         backend_options.append('mode tcp')
 
     if is_proxy:
