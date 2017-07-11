@@ -17,6 +17,7 @@ from paasta_tools.marathon_tools import get_all_namespaces
 from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
 from synapse_tools.config_plugins.ProvidenceLogging import ProvidenceLogging
+from synapse_tools.config_plugins.PathBasedRouting import PathBasedRouting
 
 def get_config(synapse_tools_config_path):
     with open(synapse_tools_config_path) as synapse_config:
@@ -456,9 +457,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     )
                 )
     
-            # Add HAProxy global, frontend, and backend options if logging is enabled
-            logging = service_info.get('logging')
-            if logging is not None:
+            # Add HAProxy options if logging is enabled
+            plugins = service_info.get('plugins', {})
+            if plugins.get('logging') is not None:
                 synapse_config['services'][service_name]['haproxy']['frontend'].extend(
                     ProvidenceLogging().frontend_opts()
                 )
@@ -467,6 +468,18 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 )
                 synapse_config['haproxy']['global'].extend(
                     ProvidenceLogging().global_opts()
+                )
+
+            # Add HAProxy options if path based routing is enabled
+            if plugins.get('path_based_routing') is not None:
+                synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                    PathBasedRouting().frontend_opts()
+                )
+                synapse_config['services'][service_name]['haproxy']['backend'].extend(
+                    PathBasedRouting().backend_opts()
+                )
+                synapse_config['haproxy']['global'].extend(
+                    PathBasedRouting().global_opts()
                 )
 
     return synapse_config

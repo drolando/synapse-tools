@@ -9,6 +9,3 @@ class ProvidenceLogging(HAProxyConfigPlugin):
 
     def backend_opts(self):
         return ['http-request lua.log_dest']
-
-if __name__ == "__main__":
-    print "Is subclass: ", issubclass(ProvidenceLogging, HAProxyConfigPlugin)
