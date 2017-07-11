@@ -16,7 +16,7 @@ from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
 from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
-
+from synapse_tools.config_plugins.ProvidenceLogging import ProvidenceLogging
 
 def get_config(synapse_tools_config_path):
     with open(synapse_tools_config_path) as synapse_config:
@@ -455,6 +455,19 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                         service_name, service_info, synapse_tools_config
                     )
                 )
+    
+            # Add HAProxy global, frontend, and backend options if logging is enabled
+            logging = service_info.get('logging')
+            if logging is not None:
+                synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                    ProvidenceLogging().frontend_opts()
+                )
+                synapse_config['services'][service_name]['haproxy']['backend'].extend(
+                    ProvidenceLogging().backend_opts()
+                )
+                synapse_config['haproxy']['global'].extend(
+                    ProvidenceLogging().global_opts()
+                )
 
     return synapse_config
 
@@ -754,4 +767,5 @@ def main():
 
 
 if __name__ == '__main__':
+    # print "I'm here!"
     main()
