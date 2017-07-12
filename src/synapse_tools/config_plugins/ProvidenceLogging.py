@@ -1,11 +1,12 @@
 from HAProxyConfigPlugin import HAProxyConfigPlugin
+from HAProxyConfigPlugin import LUA_SCRIPTS_PATH
 
 class ProvidenceLogging(HAProxyConfigPlugin):
-    def global_opts(self):
-        return ['lua-load ~/pg/synapse-tools/src/synapse_tools/lua_scripts/log_requests.lua']
+    def global_opts(self, service_name, service_info):
+        return ['lua-load ' + LUA_SCRIPTS_PATH + 'log_requests.lua']
 
-    def frontend_opts(self):
+    def frontend_opts(self, service_name, service_info):
         return ['http-request lua.log_src']
 
-    def backend_opts(self):
+    def backend_opts(self, service_name, service_info):
         return ['http-request lua.log_dest']

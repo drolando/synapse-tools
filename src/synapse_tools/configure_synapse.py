@@ -461,25 +461,25 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             plugins = service_info.get('plugins', {})
             if plugins.get('logging') is not None:
                 synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                    ProvidenceLogging().frontend_opts()
+                    ProvidenceLogging().frontend_opts(service_name, service_info)
                 )
                 synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                    ProvidenceLogging().backend_opts()
+                    ProvidenceLogging().backend_opts(service_name, service_info)
                 )
                 synapse_config['haproxy']['global'].extend(
-                    ProvidenceLogging().global_opts()
+                    ProvidenceLogging().global_opts(service_name, service_info)
                 )
 
             # Add HAProxy options if path based routing is enabled
             if plugins.get('path_based_routing') is not None:
                 synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                    PathBasedRouting().frontend_opts()
+                    PathBasedRouting().frontend_opts(service_name, service_info)
                 )
                 synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                    PathBasedRouting().backend_opts()
+                    PathBasedRouting().backend_opts(service_name, service_info)
                 )
                 synapse_config['haproxy']['global'].extend(
-                    PathBasedRouting().global_opts()
+                    PathBasedRouting().global_opts(service_name, service_info)
                 )
 
     return synapse_config
