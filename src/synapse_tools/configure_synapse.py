@@ -6,6 +6,7 @@ import filecmp
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 
@@ -145,6 +146,7 @@ def _generate_haproxy_top_level(synapse_tools_config):
         'do_writes': True,
         'do_reloads': True,
         'do_socket': True,
+        'server_order_seed': hash(socket.gethostname()),
 
         'global': [
             'daemon',
