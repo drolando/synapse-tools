@@ -7,7 +7,8 @@ function log_src(txn)
   local log_text = 'Logging source: ' .. txn.f:src()
   txn.Info(txn, log_text)
 
-  local log_file = io.open(LOGFILE_PATH + 'demo_logs', "a")
+  local fname = LOGFILE_PATH .. 'demo_log'
+  local log_file = io.open(fname, 'a')
   log_file:write(log_text)
   log_file:close(log_file)
 end
@@ -18,7 +19,8 @@ function log_dest(txn)
   local log_text = 'Logging destination'
   txn.Info(txn, log_text)
 
-  local log_file = io.open(LOGFILE_PATH + 'demo_logs', 'a')
+  local fname = LOGFILE_PATH .. 'demo_log'
+  local log_file = io.open(fname, 'a')
   log_file:write(log_text)
   log_file:close(log_file)
 end

@@ -1,6 +1,6 @@
 import abc
 
-LUA_SCRIPTS_PATH = '~/pg/synapse-tools/src/synapse_tools/lua_scripts/'
+LUA_SCRIPTS_PATH = '/nail/etc/lua_scripts/'
 
 
 class HAProxyConfigPlugin(object):

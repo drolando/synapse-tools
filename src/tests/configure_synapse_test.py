@@ -895,7 +895,7 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
     }
 
     expected_configuration['haproxy']['global'].extend(
-        ['lua-load ~/pg/synapse-tools/src/synapse_tools/lua_scripts/log_requests.lua']
+        ['lua-load /nail/etc/lua_scripts/log_requests.lua']
     )
 
     assert actual_configuration == expected_configuration
@@ -1044,8 +1044,8 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
     }
 
     expected_configuration['haproxy']['global'].extend([
-        'lua-load ~/pg/synapse-tools/src/synapse_tools/lua_scripts/log_requests.lua',
-        'lua-load ~/pg/synapse-tools/src/synapse_tools/lua_scripts/path_based_routing.lua'
+        'lua-load /nail/etc/lua_scripts/log_requests.lua',
+        'lua-load /nail/etc/lua_scripts/path_based_routing.lua'
     ])
 
     assert actual_configuration == expected_configuration

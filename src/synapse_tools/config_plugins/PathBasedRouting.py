@@ -4,7 +4,7 @@ from HAProxyConfigPlugin import LUA_SCRIPTS_PATH
 
 class PathBasedRouting(HAProxyConfigPlugin):
     def global_opts(self, service_name, service_info):
-        return ['lua-load ' + LUA_SCRIPTS_PATH + 'path_based_routing.lua']
+        return ['lua-load %spath_based_routing.lua' % LUA_SCRIPTS_PATH]
 
     def frontend_opts(self, service_name, service_info):
         return [

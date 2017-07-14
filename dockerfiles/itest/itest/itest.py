@@ -34,7 +34,7 @@ SERVICES = {
         'host': 'servicethree_1',
         'ip_address': socket.gethostbyname('servicethree_1'),
         'port': 1024,
-        'proxy_port': 20060,
+        'proxy_port': 20050,
         'mode': 'http',
         'healthcheck_uri': '/my_healthcheck_endpoint',
         'discover': 'habitat',
