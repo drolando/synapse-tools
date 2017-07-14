@@ -754,6 +754,7 @@ def test_generate_configuration_only_nginx(mock_get_current_location, mock_avail
 
     assert actual_configuration == expected_configuration
 
+
 def test_generate_configuration_with_logging_plugin(mock_get_current_location, mock_available_location_types):
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=configure_synapse.set_defaults({'bind_addr': '0.0.0.0'}),

@@ -2,6 +2,7 @@ import abc
 
 LUA_SCRIPTS_PATH = '~/pg/synapse-tools/src/synapse_tools/lua_scripts/'
 
+
 class HAProxyConfigPlugin(object):
     __metaclass__ = abc.ABCMeta
 
@@ -16,5 +17,3 @@ class HAProxyConfigPlugin(object):
     @abc.abstractmethod
     def backend_opts(self, service_name, service_info):
         return
-
-
