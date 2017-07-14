@@ -19,6 +19,7 @@ from yaml import CLoader
 from synapse_tools.config_plugins.ProvidenceLogging import ProvidenceLogging
 from synapse_tools.config_plugins.PathBasedRouting import PathBasedRouting
 
+
 def get_config(synapse_tools_config_path):
     with open(synapse_tools_config_path) as synapse_config:
         return set_defaults(json.load(synapse_config))
@@ -456,7 +457,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                         service_name, service_info, synapse_tools_config
                     )
                 )
-    
+
             # Add HAProxy options if logging is enabled
             plugins = service_info.get('plugins', {})
             if plugins.get('logging') is not None:

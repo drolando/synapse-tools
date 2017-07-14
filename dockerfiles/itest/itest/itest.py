@@ -29,6 +29,18 @@ SERVICES = {
         'advertise': ['habitat', 'region'],
     },
 
+    # HTTP service with a custom endpoint
+    'service_three.logging': {
+        'host': 'servicethree_1',
+        'ip_address': socket.gethostbyname('servicethree_1'),
+        'port': 1024,
+        'proxy_port': 20060,
+        'mode': 'http',
+        'healthcheck_uri': '/my_healthcheck_endpoint',
+        'discover': 'habitat',
+        'advertise': ['habitat'],
+    },
+
     # TCP service
     'service_one.main': {
         'host': 'serviceone_1',
@@ -179,6 +191,7 @@ def test_synapse_services(setup):
         'service_one.main',
         'service_three_chaos.main',
         'service_two.main',
+        'service_three.logging',
     ]
 
     with open('/etc/synapse/synapse.conf.json') as fd:
@@ -193,6 +206,7 @@ def test_synapse_services(setup):
             'service_one.main.nginx_listener',
             'service_two.main.nginx_listener',
             'service_three.main.nginx_listener',
+            'service_three.logging.nginx_listener',
         ]
         expected_services.extend(nginx_services)
 
@@ -396,3 +410,18 @@ def test_http_service_returns_503(setup):
         with contextlib.closing(urllib2.urlopen(uri, timeout=SOCKET_TIMEOUT)):
             assert False
         assert excinfo.value.getcode() == 503
+
+'''def test_logging_plugin(setup):
+
+    name = 'service_three.logging'
+    data = SERVICES[name]
+    uri = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
+    url = 'http://%s:6666/http/%s/0%s' % (
+        data['ip_address'], name, data['healthcheck_uri'])
+
+    request = urllib2.Request(url=url)
+
+    with contextlib.closing(
+            urllib2.urlopen(uri, timeout=SOCKET_TIMEOUT)) as page:
+        assert page.read().strip() == 'OK'
+'''
