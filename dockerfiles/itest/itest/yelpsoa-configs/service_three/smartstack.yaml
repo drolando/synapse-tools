@@ -26,3 +26,5 @@ logging:
   discover: habitat
   advertise:
   - habitat
+  plugins:
+    logging: True
