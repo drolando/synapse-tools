@@ -35,9 +35,9 @@ def set_defaults(config):
         ('listen_with_haproxy', True),
         ('haproxy.defaults.inter', '10m'),
         ('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock'),
+        ('haproxy_captured_req_headers', 'X-B3-SpanId,X-B3-TraceId,X-B3-ParentSpanId,X-B3-Flags:10,X-B3-Sampled:10'),
         ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
         ('haproxy_path', '/usr/bin/haproxy-synapse'),
-        ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
         ('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid'),
         ('haproxy_state_file_path', None),
         ('haproxy_respect_allredisp', True),
@@ -513,6 +513,16 @@ def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology,
     return service
 
 
+def _generate_captured_request_headers(synapse_tools_config):
+    header_pairs = [
+        pair.strip().partition(":") for pair in
+        synapse_tools_config['haproxy_captured_req_headers'].split(',')
+    ]
+    headers = ["capture request header %s len %s" % (pair[0], pair[2] or '64')
+               for pair in header_pairs]
+    return headers
+
+
 def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config, is_proxy):
     # Note that validations of all the following config options are done in
     # config post-receive so invalid config should never get here
@@ -548,11 +558,7 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         frontend_options.append('timeout client %dms' % timeout_client_ms)
 
     if mode == 'http':
-        frontend_options.append('capture request header X-B3-SpanId len 64')
-        frontend_options.append('capture request header X-B3-TraceId len 64')
-        frontend_options.append('capture request header X-B3-ParentSpanId len 64')
-        frontend_options.append('capture request header X-B3-Flags len 10')
-        frontend_options.append('capture request header X-B3-Sampled len 10')
+        frontend_options.extend(_generate_captured_request_headers(synapse_tools_config))
         frontend_options.append('option httplog')
     elif mode == 'tcp':
         frontend_options.append('no option accept-invalid-http-request')
