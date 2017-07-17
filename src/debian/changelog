@@ -1,3 +1,9 @@
+synapse-tools (0.13.1) lucid; urgency=low
+
+  * Make request header capture configurable
+
+ -- Ben Plotnick <plotnick@yelp.com>  Mon, 17 Jul 2017 16:33:01 -0700
+
 synapse-tools (0.13.0) lucid; urgency=low
 
   * Support HAProxy 1.7 via state file and allredisp options
