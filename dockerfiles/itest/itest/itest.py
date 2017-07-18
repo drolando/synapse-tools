@@ -172,6 +172,10 @@ def _sort_lists_in_dict(d):
     return d
 
 
+def test_haproxy_config_valid(setup):
+    subprocess.check_call(['haproxy-synapse', '-c', '-f', '/var/run/synapse/haproxy.cfg'])
+
+
 def test_haproxy_synapse_reaper(setup):
     # This should run with no errors.  Everything is running as root, so we need
     # to use the --username option here.
@@ -411,17 +415,23 @@ def test_http_service_returns_503(setup):
             assert False
         assert excinfo.value.getcode() == 503
 
-'''def test_logging_plugin(setup):
-
-    name = 'service_three.logging'
+def test_logging_plugin(setup):
+    '''name = 'service_three.logging'
     data = SERVICES[name]
     uri = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
     url = 'http://%s:6666/http/%s/0%s' % (
         data['ip_address'], name, data['healthcheck_uri'])
-
     request = urllib2.Request(url=url)
 
     with contextlib.closing(
             urllib2.urlopen(uri, timeout=SOCKET_TIMEOUT)) as page:
         assert page.read().strip() == 'OK'
-'''
+    '''
+
+    fname = '/var/log/demo_log'
+    try:
+        with open(fname) as f:
+            logs = f.readlines()
+            assert len(logs) > 0
+    except IOError as e:
+        assert False

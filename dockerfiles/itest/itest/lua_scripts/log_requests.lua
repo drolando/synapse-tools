@@ -13,7 +13,7 @@ function log_src(txn)
   log_file:close(log_file)
 end
 
-core.register_action("log_src", {"tcp-req","http-req", log_src)
+core.register_action("log_src", {"tcp-req","http-req"}, log_src)
 
 function log_dest(txn)
   local log_text = 'Logging destination'
