@@ -6,6 +6,7 @@ import filecmp
 import json
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 
@@ -36,11 +37,13 @@ def set_defaults(config):
         ('listen_with_haproxy', True),
         ('haproxy.defaults.inter', '10m'),
         ('haproxy_socket_file_path', '/var/run/synapse/haproxy.sock'),
+        ('haproxy_captured_req_headers', 'X-B3-SpanId,X-B3-TraceId,X-B3-ParentSpanId,X-B3-Flags:10,X-B3-Sampled:10'),
         ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
         ('haproxy_path', '/usr/bin/haproxy-synapse'),
-        ('haproxy_config_path', '/var/run/synapse/haproxy.cfg'),
         ('haproxy_pid_file_path', '/var/run/synapse/haproxy.pid'),
-        ('haproxy_reload_cmd_fmt', """sudo /usr/bin/synapse_qdisc_tool protect bash -c 'touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID && sleep 0.010'"""),
+        ('haproxy_state_file_path', None),
+        ('haproxy_respect_allredisp', True),
+        ('haproxy_reload_cmd_fmt', """touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID"""),
         ('haproxy_service_sockets_path_fmt',
             '/var/run/synapse/sockets/{service_name}.sock'),
         ('haproxy_restart_interval_s', 60),
@@ -133,7 +136,7 @@ def _generate_nginx_top_level(synapse_tools_config):
 
 def _generate_haproxy_top_level(synapse_tools_config):
     haproxy_inter = synapse_tools_config['haproxy.defaults.inter']
-    return {
+    top_level = {
         'bind_address': synapse_tools_config['bind_addr'],
         'restart_interval': synapse_tools_config['haproxy_restart_interval_s'],
         'restart_jitter': 0.1,
@@ -145,11 +148,14 @@ def _generate_haproxy_top_level(synapse_tools_config):
         'do_writes': True,
         'do_reloads': True,
         'do_socket': True,
+        'server_order_seed': hash(socket.gethostname()),
 
         'global': [
             'daemon',
             'maxconn %d' % synapse_tools_config['maximum_connections'],
-            'stats socket %s level admin' % synapse_tools_config['haproxy_socket_file_path'],
+            'stats socket {0} level admin'.format(
+                synapse_tools_config['haproxy_socket_file_path']
+            ),
 
             # Default of 16k is too small and causes HTTP 400 errors
             'tune.bufsize 32768',
@@ -172,10 +178,10 @@ def _generate_haproxy_top_level(synapse_tools_config):
 
             # On failure, try a different server
             'retries 1',
-            'option redispatch',
+            'option redispatch 1',
 
             # The server with the lowest number of connections receives the
-            # connection
+            # connection by default
             'balance leastconn',
 
             # Assume it's an HTTP service
@@ -234,6 +240,19 @@ def _generate_haproxy_top_level(synapse_tools_config):
             ]
         }
     }
+
+    # Just for the migration to HAProxy 1.7, when SMTSTK-190 is done
+    # always have this enabled and set the default to a sane default instead
+    # of None
+    if synapse_tools_config.get('haproxy_state_file_path'):
+        top_level['global'].append(
+            'server-state-file {0}'.format(
+                synapse_tools_config.get('haproxy_state_file_path')
+            )
+        )
+        top_level['defaults'].append('load-server-state-from-file global')
+
+    return top_level
 
 
 def generate_base_config(synapse_tools_config):
@@ -521,7 +540,20 @@ def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology,
     return service
 
 
+def _generate_captured_request_headers(synapse_tools_config):
+    header_pairs = [
+        pair.strip().partition(":") for pair in
+        synapse_tools_config['haproxy_captured_req_headers'].split(',')
+    ]
+    headers = ["capture request header %s len %s" % (pair[0], pair[2] or '64')
+               for pair in header_pairs]
+    return headers
+
+
 def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config, is_proxy):
+    # Note that validations of all the following config options are done in
+    # config post-receive so invalid config should never get here
+
     # If the service sets one timeout but not the other, set both
     # as per haproxy best practices.
     default_timeout = max(
@@ -530,6 +562,7 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     )
 
     # Server options
+    # Things that get appended to each server line in HAProxy
     mode = service_info.get('mode', 'http')
     if mode == 'http':
         server_options = 'check port %d observe layer7 maxconn %d maxqueue %d'
@@ -542,6 +575,8 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     )
 
     # Frontend options
+    # All things related to the listening sockets on HAProxy
+    # These are what clients connect to
     frontend_options = []
     timeout_client_ms = service_info.get(
         'timeout_client_ms', default_timeout
@@ -550,18 +585,31 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         frontend_options.append('timeout client %dms' % timeout_client_ms)
 
     if mode == 'http':
-        frontend_options.append('capture request header X-B3-SpanId len 64')
-        frontend_options.append('capture request header X-B3-TraceId len 64')
-        frontend_options.append('capture request header X-B3-ParentSpanId len 64')
-        frontend_options.append('capture request header X-B3-Flags len 10')
-        frontend_options.append('capture request header X-B3-Sampled len 10')
+        frontend_options.extend(_generate_captured_request_headers(synapse_tools_config))
         frontend_options.append('option httplog')
     elif mode == 'tcp':
         frontend_options.append('no option accept-invalid-http-request')
         frontend_options.append('option tcplog')
 
-    # backend options
+    # Backend options
+    # All things related to load balancing to backend servers
     backend_options = []
+
+    balance = service_info.get('balance')
+    if balance is not None and balance in ('leastconn', 'roundrobin'):
+        backend_options.append('balance %s' % balance)
+
+    keepalive = service_info.get('keepalive', False)
+    if keepalive and mode == 'http':
+        backend_options.extend([
+            'no option forceclose',
+            'option http-keep-alive'
+        ])
+
+    if mode == 'tcp':
+        # We need to put the frontend and backend into tcp mode
+        frontend_options.append('mode tcp')
+        backend_options.append('mode tcp')
 
     if is_proxy:
         backend_options.extend(
@@ -581,9 +629,6 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
     for header, value in extra_headers.iteritems():
         backend_options.append('reqadd %s:\ %s' % (header, value))
 
-    # Listen options
-    listen_options = []
-
     # hacheck healthchecking
     # Note that we use a dummy port value of '0' here because HAProxy is
     # passing in the real port using the X-Haproxy-Server-State header.
@@ -602,42 +647,41 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         (mode, service_name, port, healthcheck_uri.lstrip('/'), headers_string)
 
     healthcheck_string = healthcheck_string.strip()
-    listen_options.append(healthcheck_string)
+    backend_options.append(healthcheck_string)
 
-    listen_options.append('http-check send-state')
-
-    if mode == 'tcp':
-        listen_options.append('mode tcp')
+    backend_options.append('http-check send-state')
 
     retries = service_info.get('retries')
     if retries is not None:
-        listen_options.append('retries %d' % retries)
+        backend_options.append('retries %d' % retries)
 
-    allredisp = service_info.get('allredisp')
-    if allredisp is not None and allredisp:
-        listen_options.append('option allredisp')
+    # Once we are on 1.7, we can remove this entirely
+    if synapse_tools_config['haproxy_respect_allredisp']:
+        allredisp = service_info.get('allredisp')
+        if allredisp is not None and allredisp:
+            backend_options.append('option allredisp')
 
     timeout_connect_ms = service_info.get('timeout_connect_ms')
+
     if timeout_connect_ms is not None:
-        listen_options.append('timeout connect %dms' % timeout_connect_ms)
+        backend_options.append('timeout connect %dms' % timeout_connect_ms)
 
     timeout_server_ms = service_info.get(
         'timeout_server_ms', default_timeout
     )
     if timeout_server_ms is not None:
-        listen_options.append('timeout server %dms' % timeout_server_ms)
-
-    balance = service_info.get('balance')
-    # Validations are done in config post-receive so invalid config should
-    # be ignored
-    if balance is not None and balance in ('leastconn', 'roundrobin'):
-        listen_options.append('balance %s' % balance)
+        backend_options.append('timeout server %dms' % timeout_server_ms)
 
     return {
         'server_options': server_options,
         'frontend': frontend_options,
-        'listen': listen_options,
         'backend': backend_options,
+        # We don't actually want to use listen, it's confusing and unclear
+        # what is happening (e.g. these directives are not actually going
+        # into HAProxy listen sections, instead Synapse is automatically
+        # routing them to backend or frontend based on its understanding
+        # of HAProxy's options ... let's just do that ourselves)
+        'listen': [],
     }
 
 

@@ -423,11 +423,17 @@ def test_logging_plugin(setup):
         name = 'service_three.logging'
         data = SERVICES[name]
         url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
-        headers_list = [
-            {'From': 'Reservations'},
-            {'From': 'Search'},
-            {'From': 'Geolocator'}
-        ]
+        if setup == '/etc/synapse/synapse-tools.conf.json':
+            headers_list = [
+                {'From': 'Reservations'},
+                {'From': 'Search'},
+                {'From': 'Geolocator'}
+            ]
+        elif setup == '/etc/synapse/synapse-tools-both.conf.json':
+            headers_list = [
+                {'From': 'Highlights'},
+                {'From': 'Users'}
+            ]
 
         for headers in headers_list:
             request = urllib2.Request(url=url, headers=headers)
