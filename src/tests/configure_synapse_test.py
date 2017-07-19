@@ -807,11 +807,7 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                 ],
             },
             'haproxy': {
-                'listen': [
-                    'option httpchk GET /http/proxy_service/0/status',
-                    'http-check send-state',
-                    'balance roundrobin',
-                ],
+                'listen': [],
                 'frontend': [
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
@@ -825,8 +821,11 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'http-request lua.log_src'
                 ],
                 'backend': [
+                    'balance roundrobin',
                     'acl is_status_request path /status',
                     'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
+                    'option httpchk GET /http/proxy_service/0/status',
+                    'http-check send-state',
                 ],
                 'port': '5678',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -849,14 +848,7 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                 ],
             },
             'haproxy': {
-                'listen': [
-                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
-                    'http-check send-state',
-                    'retries 2',
-                    'timeout connect 2000ms',
-                    'timeout server 3000ms',
-                    'balance roundrobin',
-                ],
+                'listen': [],
                 'frontend': [
                     'timeout client 3000ms',
                     'capture request header X-B3-SpanId len 64',
@@ -875,8 +867,14 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'use_backend test_service if test_service_has_connslots',
                 ],
                 'backend': [
+                    'balance roundrobin',
                     'reqidel ^X-Mode:.*',
                     'reqadd X-Mode:\ ro',
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
                 ],
                 'port': '1234',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -953,11 +951,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                 ],
             },
             'haproxy': {
-                'listen': [
-                    'option httpchk GET /http/proxy_service/0/status',
-                    'http-check send-state',
-                    'balance roundrobin',
-                ],
+                'listen': [],
                 'frontend': [
                     'capture request header X-B3-SpanId len 64',
                     'capture request header X-B3-TraceId len 64',
@@ -970,8 +964,11 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'use_backend proxy_service if proxy_service_has_connslots'
                 ],
                 'backend': [
+                    'balance roundrobin',
                     'acl is_status_request path /status',
-                    'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request'
+                    'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
+                    'option httpchk GET /http/proxy_service/0/status',
+                    'http-check send-state',
                 ],
                 'port': '5678',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -994,14 +991,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                 ],
             },
             'haproxy': {
-                'listen': [
-                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
-                    'http-check send-state',
-                    'retries 2',
-                    'timeout connect 2000ms',
-                    'timeout server 3000ms',
-                    'balance roundrobin',
-                ],
+                'listen': [],
                 'frontend': [
                     'timeout client 3000ms',
                     'capture request header X-B3-SpanId len 64',
@@ -1023,8 +1013,14 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'use_backend %[var(txn.backend_name)]'
                 ],
                 'backend': [
+                    'balance roundrobin',
                     'reqidel ^X-Mode:.*',
                     'reqadd X-Mode:\ ro',
+                    'option httpchk GET /http/test_service/0/status HTTP/1.1\\r\\nX-Mode:\\ ro',
+                    'http-check send-state',
+                    'retries 2',
+                    'timeout connect 2000ms',
+                    'timeout server 3000ms',
                 ],
                 'port': '1234',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
