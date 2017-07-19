@@ -10,4 +10,4 @@ class ProvidenceLogging(HAProxyConfigPlugin):
         return ['http-request lua.log_src']
 
     def backend_opts(self, service_name, service_info):
-        return ['http-request lua.log_dest']
+        return []

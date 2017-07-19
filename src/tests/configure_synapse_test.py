@@ -835,7 +835,6 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                 'backend': [
                     'acl is_status_request path /status',
                     'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
-                    'http-request lua.log_dest'
                 ],
                 'port': '5678',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -1034,7 +1033,6 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                 'backend': [
                     'reqidel ^X-Mode:.*',
                     'reqadd X-Mode:\ ro',
-                    'http-request lua.log_dest'
                 ],
                 'port': '1234',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
