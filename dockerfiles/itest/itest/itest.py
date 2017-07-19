@@ -416,22 +416,37 @@ def test_http_service_returns_503(setup):
         assert excinfo.value.getcode() == 503
 
 def test_logging_plugin(setup):
-    '''name = 'service_three.logging'
-    data = SERVICES[name]
-    uri = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
-    url = 'http://%s:6666/http/%s/0%s' % (
-        data['ip_address'], name, data['healthcheck_uri'])
-    request = urllib2.Request(url=url)
+    # Test plugins only with HAProxy
+    if 'nginx' not in setup:
 
-    with contextlib.closing(
-            urllib2.urlopen(uri, timeout=SOCKET_TIMEOUT)) as page:
-        assert page.read().strip() == 'OK'
-    '''
+        # Send mock requests
+        name = 'service_three.logging'
+        data = SERVICES[name]
+        url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
+        headers_list = [
+            {'From': 'Reservations'},
+            {'From': 'Search'},
+            {'From': 'Geolocator'}
+        ]
 
-    fname = '/var/log/demo_log'
-    try:
-        with open(fname) as f:
-            logs = f.readlines()
-            assert len(logs) > 0
-    except IOError as e:
-        assert False
+        for headers in headers_list:
+            request = urllib2.Request(url=url, headers=headers)
+            with contextlib.closing(
+                    urllib2.urlopen(request, timeout=SOCKET_TIMEOUT)) as page:
+                assert page.read().strip() == 'OK'
+
+        # Check that requests were logged
+        log_file = '/var/log/demo_log'
+        try:
+            with open(log_file) as f:
+                logs = f.readlines()
+                n = len(headers_list)
+                assert len(logs) >= n
+
+                logs_tail = logs[-n:]
+                for i in xrange(n):
+                    expected = 'From: %s' % headers_list[i]['From']
+                    assert expected in logs_tail[i]
+
+        except IOError as e:
+            assert False
