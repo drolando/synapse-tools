@@ -3,14 +3,24 @@
 LOGFILE_PATH = '/var/log/'
 
 function log_src(txn)
-  local ip_from = txn.f:src()
-  local log_text = 'Logging source: ' .. txn.f:src()
+  local ip = "N/A"
+  if txn.f:src() ~= nil then
+     ip = txn.f:src()
+  end
+
+  local from = "N/A"
+  local hdr = txn.http:req_get_headers()
+  if hdr["from"] ~= nil then
+    from = hdr["from"][0]
+  end
+
+  local log_text = 'Source: ' .. ip .. ' From: ' .. from .. '\n'
   txn.Info(txn, log_text)
 
   local fname = LOGFILE_PATH .. 'demo_log'
   local log_file = io.open(fname, 'a')
   log_file:write(log_text)
-  log_file:close(log_file)
+  io.close(log_file)
 end
 
 core.register_action("log_src", {"tcp-req","http-req"}, log_src)
