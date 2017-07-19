@@ -452,8 +452,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     # at this stage.
                     else:
                         config['haproxy']['port'] = None
-                        config['haproxy']['bind_address'] = _get_socket_path(
-                            synapse_tools_config, service_name
+                        config['haproxy']['bind_address'] = socket_path
+                        config['haproxy']['frontend'].append(
+                            'bind {0} accept-proxy'.format(socket_proxy_path)
                         )
                 else:
                     # The backend only watchers don't need frontend
@@ -686,6 +687,10 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     # just to really really make sure that HAProxy does the error codes
     timeout = int(DEFAULT_REAP_AGE_S) + 10
     server = ['proxy_timeout {0}s'.format(timeout)]
+
+    # Send PROXY protocol to HAProxy proxy sockets only if enabled
+    if synapse_tools_config['proxy_proto']:
+        server.append('proxy_protocol on')
 
     # All we want from nginx is TCP termination, no http even for
     # http services. HAProxy is responsible for all layer7 choices

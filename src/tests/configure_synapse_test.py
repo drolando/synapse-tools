@@ -672,6 +672,7 @@ def test_generate_configuration_only_nginx(mock_get_current_location, mock_avail
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
+                    'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                     'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
