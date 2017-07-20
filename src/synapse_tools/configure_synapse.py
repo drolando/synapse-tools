@@ -21,6 +21,12 @@ from synapse_tools.config_plugins.ProvidenceLogging import ProvidenceLogging
 from synapse_tools.config_plugins.PathBasedRouting import PathBasedRouting
 
 
+PLUGIN_MAP = {
+    'logging': ProvidenceLogging(),
+    'path_based_routing': PathBasedRouting()
+}
+
+
 def get_config(synapse_tools_config_path):
     with open(synapse_tools_config_path) as synapse_config:
         return set_defaults(json.load(synapse_config))
@@ -477,30 +483,20 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     )
                 )
 
-            # Add HAProxy options if logging is enabled
+            # Add HAProxy options for plugins
             plugins = service_info.get('plugins', {})
-            if plugins.get('logging') is not None:
-                synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                    ProvidenceLogging().frontend_opts(service_name, service_info)
-                )
-                synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                    ProvidenceLogging().backend_opts(service_name, service_info)
-                )
-                synapse_config['haproxy']['global'].extend(
-                    ProvidenceLogging().global_opts(service_name, service_info)
-                )
-
-            # Add HAProxy options if path based routing is enabled
-            if plugins.get('path_based_routing') is not None:
-                synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                    PathBasedRouting().frontend_opts(service_name, service_info)
-                )
-                synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                    PathBasedRouting().backend_opts(service_name, service_info)
-                )
-                synapse_config['haproxy']['global'].extend(
-                    PathBasedRouting().global_opts(service_name, service_info)
-                )
+            for plugin_name in PLUGIN_MAP.keys():
+                if plugins.get(plugin_name):
+                    plugin_class = PLUGIN_MAP[plugin_name]
+                    synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                        plugin_class.frontend_opts(service_name, service_info)
+                    )
+                    synapse_config['services'][service_name]['haproxy']['backend'].extend(
+                        plugin_class.backend_opts(service_name, service_info)
+                    )
+                    synapse_config['haproxy']['global'].extend(
+                        plugin_class.global_opts(service_name, service_info)
+                    )
 
     return synapse_config
 

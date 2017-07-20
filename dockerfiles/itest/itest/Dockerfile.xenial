@@ -17,12 +17,20 @@ RUN apt-get update && apt-get -y install \
     libxslt-dev \
     build-essential \
     zlib1g-dev \
-    nginx
+    nginx \
+    liblua5.3-dev \
+    libssl-dev
 
+# HAProxy configured with Lua scripting
+WORKDIR /
 ADD https://github.com/haproxy/haproxy/archive/v1.6.0.tar.gz /haproxy.tar.gz
 RUN tar -axvf /haproxy.tar.gz
 WORKDIR /haproxy-1.6.0
-RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
+RUN make TARGET=linux26 \
+    USE_LUA=1 \
+    LUA_LIB=/usr/lib/x86_64-linux-gnu \
+    LUA_INC=/usr/include/lua5.3 \
+    && mv haproxy /usr/bin/haproxy-synapse
 
 # Pin for test reproducibility
 RUN gem install --no-ri --no-rdoc nokogiri -v 1.6.7.2
@@ -42,6 +50,7 @@ ADD ecosystem /nail/etc/ecosystem
 ADD region /nail/etc/region
 ADD itest.py /itest.py
 ADD run_itest.sh /run_itest.sh
+ADD lua_scripts /nail/etc/lua_scripts
 
 # configure_synapse tries to restart synapse.
 # make it think it succeeded.
