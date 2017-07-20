@@ -485,7 +485,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             # Add HAProxy options for plugins
             plugins = service_info.get('plugins', {})
-            for plugin_name in PLUGIN_MAP.keys():
+            for plugin_name in sorted(PLUGIN_MAP.keys()):
                 if plugins.get(plugin_name):
                     plugin_class = PLUGIN_MAP[plugin_name]
                     synapse_config['services'][service_name]['haproxy']['frontend'].extend(
