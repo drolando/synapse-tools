@@ -953,3 +953,51 @@ def test_discovery_only_services(mock_get_current_location, mock_available_locat
     }
 
     assert actual_configuration == expected_configuration
+
+
+def test_nginx_no_proxy_proto(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'listen_with_nginx': True,
+        'proxy_proto': False,
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            ('test_service', {'proxy_port': 1234}),
+        ]
+    )
+
+    # Check HAProxy binds on both PROXY protocol and regular TCP unix sockets
+    frontend = actual_configuration['services']['test_service']['haproxy']['frontend']
+    assert 'bind /var/run/synapse/sockets/test_service.sock' in frontend
+    assert 'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy' in frontend
+
+    # Check nginx doesn't send regular tcp traffic to the proxy socket
+    nginx = actual_configuration['services']['test_service.nginx_listener']
+    assert nginx['default_servers'][0]['port'] == '/var/run/synapse/sockets/test_service.sock'
+    assert 'proxy_protocol on' not in nginx['nginx']['server']
+
+
+def test_nginx_proxy_proto(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'listen_with_nginx': True,
+        'proxy_proto': True,
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            ('test_service', {'proxy_port': 1234}),
+        ]
+    )
+
+    # Check HAProxy binds on both PROXY protocol and regular TCP unix sockets
+    frontend = actual_configuration['services']['test_service']['haproxy']['frontend']
+    assert 'bind /var/run/synapse/sockets/test_service.sock' in frontend
+    assert 'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy' in frontend
+
+    # Check nginx sends PROXY protocol traffic to the correct socket when enabled
+    nginx = actual_configuration['services']['test_service.nginx_listener']
+    assert nginx['default_servers'][0]['port'] == '/var/run/synapse/sockets/test_service.proxy_sock'
+    assert 'proxy_protocol on' in nginx['nginx']['server']
