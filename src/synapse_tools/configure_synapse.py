@@ -44,6 +44,8 @@ def set_defaults(config):
         ('haproxy_reload_cmd_fmt', """touch {haproxy_pid_file_path} && PID=$(cat {haproxy_pid_file_path}) && {haproxy_path} -f {haproxy_config_path} -p {haproxy_pid_file_path} -sf $PID"""),
         ('haproxy_service_sockets_path_fmt',
             '/var/run/synapse/sockets/{service_name}.sock'),
+        ('haproxy_service_proxy_sockets_path_fmt',
+            '/var/run/synapse/sockets/{service_name}.proxy_sock'),
         ('haproxy_restart_interval_s', 60),
         # Misc options
         ('file_output_path', '/var/run/synapse/services'),
@@ -61,6 +63,7 @@ def set_defaults(config):
         ('nginx_prefix', '/var/run/synapse/nginx_temp'),
         ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
         ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
+        ('nginx_proxy_proto', False),
         # http://nginx.org/en/docs/control.html#upgrade
         # This is apparently how you gracefully reload the binary ...
         ('nginx_reload_cmd_fmt',
@@ -295,8 +298,13 @@ def get_backend_name(service_name, discover_type, advertise_type):
         return '%s.%s' % (service_name, advertise_type)
 
 
-def _get_socket_path(synapse_tools_config, service_name):
-    socket_path = synapse_tools_config['haproxy_service_sockets_path_fmt'].format(
+def _get_socket_path(synapse_tools_config, service_name, proxy_proto=False):
+    if proxy_proto:
+        socket_fmt_option = 'haproxy_service_proxy_sockets_path_fmt'
+    else:
+        socket_fmt_option = 'haproxy_service_sockets_path_fmt'
+
+    socket_path = synapse_tools_config[socket_fmt_option].format(
         service_name=service_name
     )
     return socket_path
@@ -405,6 +413,10 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             synapse_tools_config, service_name
         )
 
+        socket_proxy_path = _get_socket_path(
+            synapse_tools_config, service_name, proxy_proto=True
+        )
+
         for advertise_type in advertise_types:
             backend_identifier = get_backend_name(
                 service_name, discover_type, advertise_type
@@ -428,8 +440,11 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     # Specify a proxy port to create a frontend for this service
                     if synapse_tools_config['listen_with_haproxy']:
                         config['haproxy']['port'] = str(proxy_port)
-                        config['haproxy']['frontend'].append(
-                            'bind {0}'.format(socket_path)
+                        config['haproxy']['frontend'].extend(
+                            [
+                                'bind {0}'.format(socket_path),
+                                'bind {0} accept-proxy'.format(socket_proxy_path),
+                            ]
                         )
                     # If listen_with_haproxy is False, then have
                     # HAProxy bind only to the socket. Nginx may or may not
@@ -437,8 +452,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                     # at this stage.
                     else:
                         config['haproxy']['port'] = None
-                        config['haproxy']['bind_address'] = _get_socket_path(
-                            synapse_tools_config, service_name
+                        config['haproxy']['bind_address'] = socket_path
+                        config['haproxy']['frontend'].append(
+                            'bind {0} accept-proxy'.format(socket_proxy_path)
                         )
                 else:
                     # The backend only watchers don't need frontend
@@ -659,7 +675,11 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
 
 
 def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config):
-    socket_path = _get_socket_path(synapse_tools_config, service_name)
+    socket_path = _get_socket_path(
+        synapse_tools_config,
+        service_name,
+        proxy_proto=synapse_tools_config['nginx_proxy_proto'],
+    )
 
     # For the nginx listener, we just want the highest possible timeout.
     # To limit memory usage we set this to the max reap age (so HAProxy will
@@ -667,6 +687,10 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     # just to really really make sure that HAProxy does the error codes
     timeout = int(DEFAULT_REAP_AGE_S) + 10
     server = ['proxy_timeout {0}s'.format(timeout)]
+
+    # Send PROXY protocol to HAProxy proxy sockets only if enabled
+    if synapse_tools_config['nginx_proxy_proto']:
+        server.append('proxy_protocol on')
 
     # All we want from nginx is TCP termination, no http even for
     # http services. HAProxy is responsible for all layer7 choices

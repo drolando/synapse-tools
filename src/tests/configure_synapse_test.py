@@ -133,6 +133,7 @@ def test_generate_configuration(mock_get_current_location, mock_available_locati
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
                     'bind /var/run/synapse/sockets/test_service.sock',
+                    'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                     'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
@@ -293,6 +294,7 @@ def test_generate_configuration_single_advertise(mock_get_current_location, mock
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
                     'bind /var/run/synapse/sockets/test_service.sock',
+                    'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                 ],
@@ -395,6 +397,7 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
                     'bind /var/run/synapse/sockets/proxy_service.sock',
+                    'bind /var/run/synapse/sockets/proxy_service.proxy_sock accept-proxy',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
                 ],
@@ -437,6 +440,7 @@ def test_generate_configuration_with_proxied_through(mock_get_current_location, 
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
                     'bind /var/run/synapse/sockets/test_service.sock',
+                    'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy',
                     'acl is_status_request path /status',
                     'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i proxy_service',
                     'acl proxied_through_backend_has_connslots connslots(proxy_service) gt 0',
@@ -526,6 +530,7 @@ def test_generate_configuration_with_nginx(mock_get_current_location, mock_avail
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
                     'bind /var/run/synapse/sockets/test_service.sock',
+                    'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                     'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
@@ -667,6 +672,7 @@ def test_generate_configuration_only_nginx(mock_get_current_location, mock_avail
                     'capture request header X-B3-Flags len 10',
                     'capture request header X-B3-Sampled len 10',
                     'option httplog',
+                    'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
                     'acl test_service.superregion_has_connslots connslots(test_service.superregion) gt 0',
@@ -947,3 +953,51 @@ def test_discovery_only_services(mock_get_current_location, mock_available_locat
     }
 
     assert actual_configuration == expected_configuration
+
+
+def test_nginx_no_proxy_proto(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'listen_with_nginx': True,
+        'nginx_proxy_proto': False,
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            ('test_service', {'proxy_port': 1234}),
+        ]
+    )
+
+    # Check HAProxy binds on both PROXY protocol and regular TCP unix sockets
+    frontend = actual_configuration['services']['test_service']['haproxy']['frontend']
+    assert 'bind /var/run/synapse/sockets/test_service.sock' in frontend
+    assert 'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy' in frontend
+
+    # Check nginx doesn't send regular tcp traffic to the proxy socket
+    nginx = actual_configuration['services']['test_service.nginx_listener']
+    assert nginx['default_servers'][0]['port'] == '/var/run/synapse/sockets/test_service.sock'
+    assert 'proxy_protocol on' not in nginx['nginx']['server']
+
+
+def test_nginx_proxy_proto(mock_get_current_location, mock_available_location_types):
+    synapse_tools_config = configure_synapse.set_defaults({
+        'listen_with_nginx': True,
+        'nginx_proxy_proto': True,
+    })
+    actual_configuration = configure_synapse.generate_configuration(
+        synapse_tools_config=synapse_tools_config,
+        zookeeper_topology=['1.2.3.4', '2.3.4.5'],
+        services=[
+            ('test_service', {'proxy_port': 1234}),
+        ]
+    )
+
+    # Check HAProxy binds on both PROXY protocol and regular TCP unix sockets
+    frontend = actual_configuration['services']['test_service']['haproxy']['frontend']
+    assert 'bind /var/run/synapse/sockets/test_service.sock' in frontend
+    assert 'bind /var/run/synapse/sockets/test_service.proxy_sock accept-proxy' in frontend
+
+    # Check nginx sends PROXY protocol traffic to the correct socket when enabled
+    nginx = actual_configuration['services']['test_service.nginx_listener']
+    assert nginx['default_servers'][0]['port'] == '/var/run/synapse/sockets/test_service.proxy_sock'
+    assert 'proxy_protocol on' in nginx['nginx']['server']
