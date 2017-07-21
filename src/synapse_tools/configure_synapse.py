@@ -17,13 +17,14 @@ from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
 from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
-from synapse_tools.config_plugins.ProvidenceLogging import ProvidenceLogging
-from synapse_tools.config_plugins.PathBasedRouting import PathBasedRouting
+from synapse_tools.config_plugins.base import LuaPlugin
+from synapse_tools.config_plugins.logging import Logging
+from synapse_tools.config_plugins.path_based_routing import PathBasedRouting
 
 
 PLUGIN_MAP = {
-    'logging': ProvidenceLogging(),
-    'path_based_routing': PathBasedRouting()
+    'logging': Logging,
+    'path_based_routing': PathBasedRouting
 }
 
 
@@ -63,6 +64,7 @@ def set_defaults(config):
             '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'),
         ('hacheck_port', 6666),
         ('stats_port', 3212),
+        ('lua_scripts_path', '/nail/etc/lua_scripts/'),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
@@ -485,18 +487,22 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             # Add HAProxy options for plugins
             plugins = service_info.get('plugins', {})
-            for plugin_name in sorted(PLUGIN_MAP.keys()):
-                if plugins.get(plugin_name):
-                    plugin_class = PLUGIN_MAP[plugin_name]
-                    synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                        plugin_class.frontend_opts(service_name, service_info)
-                    )
-                    synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                        plugin_class.backend_opts(service_name, service_info)
-                    )
-                    synapse_config['haproxy']['global'].extend(
-                        plugin_class.global_opts(service_name, service_info)
-                    )
+            for plugin_name in sorted(plugins.keys()):
+                if issubclass(PLUGIN_MAP[plugin_name], LuaPlugin):
+                    path = synapse_tools_config['lua_scripts_path']
+                    plugin_instance = PLUGIN_MAP[plugin_name](path)
+                else:
+                    plugin_instance = PLUGIN_MAP[plugin_name]()
+
+                synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                    plugin_instance.frontend_options(service_name, service_info)
+                )
+                synapse_config['services'][service_name]['haproxy']['backend'].extend(
+                    plugin_instance.backend_options(service_name, service_info)
+                )
+                synapse_config['haproxy']['global'].extend(
+                    plugin_instance.global_options(service_name, service_info)
+                )
 
     return synapse_config
 
