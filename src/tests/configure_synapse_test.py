@@ -958,7 +958,7 @@ def test_discovery_only_services(mock_get_current_location, mock_available_locat
 def test_nginx_no_proxy_proto(mock_get_current_location, mock_available_location_types):
     synapse_tools_config = configure_synapse.set_defaults({
         'listen_with_nginx': True,
-        'proxy_proto': False,
+        'nginx_proxy_proto': False,
     })
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=synapse_tools_config,
@@ -982,7 +982,7 @@ def test_nginx_no_proxy_proto(mock_get_current_location, mock_available_location
 def test_nginx_proxy_proto(mock_get_current_location, mock_available_location_types):
     synapse_tools_config = configure_synapse.set_defaults({
         'listen_with_nginx': True,
-        'proxy_proto': True,
+        'nginx_proxy_proto': True,
     })
     actual_configuration = configure_synapse.generate_configuration(
         synapse_tools_config=synapse_tools_config,

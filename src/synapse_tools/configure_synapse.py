@@ -57,13 +57,13 @@ def set_defaults(config):
             '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'),
         ('hacheck_port', 6666),
         ('stats_port', 3212),
-        ('proxy_proto', False),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
         ('nginx_prefix', '/var/run/synapse/nginx_temp'),
         ('nginx_config_path', '/var/run/synapse/nginx.cfg'),
         ('nginx_pid_file_path', '/var/run/synapse/nginx.pid'),
+        ('nginx_proxy_proto', False),
         # http://nginx.org/en/docs/control.html#upgrade
         # This is apparently how you gracefully reload the binary ...
         ('nginx_reload_cmd_fmt',
@@ -678,7 +678,7 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     socket_path = _get_socket_path(
         synapse_tools_config,
         service_name,
-        proxy_proto=synapse_tools_config['proxy_proto'],
+        proxy_proto=synapse_tools_config['nginx_proxy_proto'],
     )
 
     # For the nginx listener, we just want the highest possible timeout.
@@ -689,7 +689,7 @@ def _generate_nginx_for_watcher(service_name, service_info, synapse_tools_config
     server = ['proxy_timeout {0}s'.format(timeout)]
 
     # Send PROXY protocol to HAProxy proxy sockets only if enabled
-    if synapse_tools_config['proxy_proto']:
+    if synapse_tools_config['nginx_proxy_proto']:
         server.append('proxy_protocol on')
 
     # All we want from nginx is TCP termination, no http even for
