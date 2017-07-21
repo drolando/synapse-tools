@@ -28,6 +28,7 @@ ADD ecosystem /nail/etc/ecosystem
 ADD region /nail/etc/region
 ADD itest.py /itest.py
 ADD run_itest.sh /run_itest.sh
+ADD lua_scripts /nail/etc/lua_scripts
 
 # configure_synapse tries to restart synapse.
 # make it think it succeeded.
