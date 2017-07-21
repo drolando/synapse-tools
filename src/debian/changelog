@@ -1,3 +1,9 @@
+synapse-tools (0.13.2) lucid; urgency=low
+
+  * Add PROXY protocol support
+
+ -- Jason Perrin <jvperrin@yelp.com>  Wed, 19 Jul 2017 10:37:45 -0700
+
 synapse-tools (0.13.1) lucid; urgency=low
 
   * Make request header capture configurable
