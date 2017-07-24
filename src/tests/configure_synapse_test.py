@@ -904,8 +904,8 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'timeout_connect_ms': 2000,
                     'timeout_server_ms': 3000,
                     'plugins': {
-                        'logging': True,
-                        'path_based_routing': True
+                        'path_based_routing': True,
+                        'logging': True
                     },
                     'extra_headers': {
                         'X-Mode': 'ro'

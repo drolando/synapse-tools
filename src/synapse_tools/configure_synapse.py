@@ -480,7 +480,9 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
 
             # Add HAProxy options for plugins
             plugins = service_info.get('plugins', {})
-            for plugin_name in sorted(plugins.keys()):
+            for plugin_name in PLUGIN_MAP:
+                if plugin_name not in plugins:
+                    continue
                 if issubclass(PLUGIN_MAP[plugin_name], LuaPlugin):
                     path = synapse_tools_config['lua_scripts_path']
                     plugin_instance = PLUGIN_MAP[plugin_name](path)
