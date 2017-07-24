@@ -18,14 +18,7 @@ from paasta_tools.marathon_tools import get_all_namespaces
 from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
 from synapse_tools.config_plugins.base import LuaPlugin
-from synapse_tools.config_plugins.logging import Logging
-from synapse_tools.config_plugins.path_based_routing import PathBasedRouting
-
-
-PLUGIN_MAP = {
-    'logging': Logging,
-    'path_based_routing': PathBasedRouting
-}
+from synapse_tools.config_plugins.map import PLUGIN_MAP
 
 
 def get_config(synapse_tools_config_path):
