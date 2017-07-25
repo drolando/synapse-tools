@@ -45,7 +45,7 @@ def set_defaults(config):
         ('haproxy_service_sockets_path_fmt',
             '/var/run/synapse/sockets/{service_name}.sock'),
         ('haproxy_service_proxy_sockets_path_fmt',
-            '/var/run/synapse/sockets/{service_name}.proxy_sock'),
+            '/var/run/synapse/sockets/{service_name}.prxy'),
         ('haproxy_restart_interval_s', 60),
         # Misc options
         ('file_output_path', '/var/run/synapse/services'),
