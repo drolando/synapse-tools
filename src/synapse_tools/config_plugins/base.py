@@ -39,5 +39,5 @@ class HAProxyConfigPlugin(object):
 
 
 class LuaPlugin(object):
-    def __init__(self, lua_scripts_path):
-        self.lua_scripts_path = lua_scripts_path
+    def __init__(self, lua_dir_path):
+        self.lua_dir_path = lua_dir_path

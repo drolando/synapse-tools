@@ -1,13 +1,15 @@
+import os
 from base import HAProxyConfigPlugin
 from base import LuaPlugin
 
 
 class PathBasedRouting(HAProxyConfigPlugin, LuaPlugin):
-    def __init__(self, lua_scripts_path):
-        super(PathBasedRouting, self).__init__(lua_scripts_path)
+    def __init__(self, lua_dir_path):
+        super(PathBasedRouting, self).__init__(lua_dir_path)
 
     def global_options(self, service_name, service_info):
-        return ['lua-load %spath_based_routing.lua' % self.lua_scripts_path]
+        file_path = os.path.join(self.lua_dir_path, 'path_based_routing.lua')
+        return ['lua-load %s' % file_path]
 
     def frontend_options(self, service_name, service_info):
         return [

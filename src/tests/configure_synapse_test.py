@@ -887,7 +887,14 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
         ['lua-load /nail/etc/lua_scripts/log_requests.lua']
     )
 
-    assert actual_configuration == expected_configuration
+    # check frontend and backend sections
+    assert actual_configuration['services'] == expected_configuration['services']
+
+    # check global section separately because lua-load file path will vary
+    actual_global = actual_configuration['haproxy']['global']
+    expected_global = expected_configuration['haproxy']['global']
+    assert actual_global[:-1] == expected_global[:-1]
+    assert 'lua-load' and 'log_requests' in actual_global[-1]
 
 
 def test_generate_configuration_with_multiple_plugins(mock_get_current_location, mock_available_location_types):
@@ -1034,7 +1041,15 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
         'lua-load /nail/etc/lua_scripts/path_based_routing.lua'
     ])
 
-    assert actual_configuration == expected_configuration
+    # check frontend and backend sections
+    assert actual_configuration['services'] == expected_configuration['services']
+
+    # check global section separately because lua-load file path will vary
+    actual_global = actual_configuration['haproxy']['global']
+    expected_global = expected_configuration['haproxy']['global']
+    assert actual_global[:-2] == expected_global[:-2]
+    assert 'lua-load' and 'log_requests' in actual_global[-2]
+    assert 'lua-load' and 'path_based_routing' in actual_global[-1]
 
 
 @contextlib.contextmanager

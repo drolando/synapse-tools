@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 import yaml
+import synapse_tools
 from environment_tools.type_utils import available_location_types
 from environment_tools.type_utils import compare_types
 from environment_tools.type_utils import get_current_location
@@ -57,7 +58,6 @@ def set_defaults(config):
             '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'),
         ('hacheck_port', 6666),
         ('stats_port', 3212),
-        ('lua_scripts_path', '/nail/etc/lua_scripts/'),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
@@ -484,8 +484,8 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 if plugin_name not in plugins:
                     continue
                 if issubclass(PLUGIN_MAP[plugin_name], LuaPlugin):
-                    path = synapse_tools_config['lua_scripts_path']
-                    plugin_instance = PLUGIN_MAP[plugin_name](path)
+                    lua_dir_path = os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')
+                    plugin_instance = PLUGIN_MAP[plugin_name](lua_dir_path)
                 else:
                     plugin_instance = PLUGIN_MAP[plugin_name]()
 
