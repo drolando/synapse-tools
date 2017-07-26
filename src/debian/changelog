@@ -1,3 +1,15 @@
+synapse-tools (0.13.3) lucid; urgency=low
+
+  * Rename proxy socket to be shorter to avoid issues with long sockets
+
+ -- Jason Perrin <jvperrin@yelp.com>  Tue, 25 Jul 2017 11:34:39 -0700
+
+synapse-tools (0.13.2) lucid; urgency=low
+
+  * Add PROXY protocol support
+
+ -- Jason Perrin <jvperrin@yelp.com>  Wed, 19 Jul 2017 10:37:45 -0700
+
 synapse-tools (0.13.1) lucid; urgency=low
 
   * Make request header capture configurable

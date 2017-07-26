@@ -27,7 +27,15 @@
 
     "files":
         [
-        {"includePattern": "dist/(synapse-tools.*\.deb)", "uploadPattern": "$1", "matrixParams": { "deb_distribution": "trusty", "deb_component": "main", "deb_architecture": "amd64"} }
+            {
+                "includePattern": "dist/(synapse-tools.*\.deb)",
+                "uploadPattern": "$1",
+                "matrixParams": {
+                    "deb_distribution": "@DISTRIBUTION@",
+                    "deb_component": "main",
+                    "deb_architecture": "amd64"
+                }
+            }
         ],
     "publish": true
 }

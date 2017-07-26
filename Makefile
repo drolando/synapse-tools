@@ -1,9 +1,12 @@
 DATE := $(shell date +'%Y-%m-%d')
 SYNAPSETOOLSVERSION := $(shell sed 's/.*(\(.*\)).*/\1/;q' src/debian/changelog)
-bintray.json: bintray.json.in src/debian/changelog
-	sed -e 's/@DATE@/$(DATE)/g' -e 's/@SYNAPSETOOLSVERSION@/$(SYNAPSETOOLSVERSION)/g' $< > $@
+bintray_%: bintray.json.in src/debian/changelog
+	sed -e 's/@DATE@/$(DATE)/g' \
+	    -e 's/@SYNAPSETOOLSVERSION@/$(SYNAPSETOOLSVERSION)/g' \
+	    -e 's/@DISTRIBUTION@/$*/g' \
+            bintray.json.in > bintray.json
 
-itest_%: package_%
+itest_%: package_% bintray_%
 	rm -rf dockerfiles/itest/itest_$*
 	cp -a dockerfiles/itest/itest dockerfiles/itest/itest_$*
 	cp dockerfiles/itest/itest/Dockerfile.$* dockerfiles/itest/itest_$*/Dockerfile
