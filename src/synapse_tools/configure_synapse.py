@@ -18,7 +18,6 @@ from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
 from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
-from synapse_tools.config_plugins.base import LuaPlugin
 from synapse_tools.config_plugins.map import PLUGIN_MAP
 
 
@@ -60,6 +59,7 @@ def set_defaults(config):
             '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'),
         ('hacheck_port', 6666),
         ('stats_port', 3212),
+        ('lua_dir', os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
@@ -499,20 +499,19 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             for plugin_name in PLUGIN_MAP:
                 if plugin_name not in plugins:
                     continue
-                if issubclass(PLUGIN_MAP[plugin_name], LuaPlugin):
-                    lua_dir_path = os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')
-                    plugin_instance = PLUGIN_MAP[plugin_name](lua_dir_path)
-                else:
-                    plugin_instance = PLUGIN_MAP[plugin_name]()
-
+                plugin_instance = PLUGIN_MAP[plugin_name](
+                    service_name,
+                    service_info,
+                    synapse_tools_config
+                )
                 synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                    plugin_instance.frontend_options(service_name, service_info)
+                    plugin_instance.frontend_options()
                 )
                 synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                    plugin_instance.backend_options(service_name, service_info)
+                    plugin_instance.backend_options()
                 )
                 synapse_config['haproxy']['global'].extend(
-                    plugin_instance.global_options(service_name, service_info)
+                    plugin_instance.global_options()
                 )
 
     return synapse_config
