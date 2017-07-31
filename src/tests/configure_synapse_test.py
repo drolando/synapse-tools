@@ -1100,7 +1100,13 @@ def test_synapse_restarted_when_config_files_differ():
 
         mock_copy.assert_called_with(
             mock_tmp_file.__enter__().name, '/etc/synapse/synapse.conf.json')
-        mock_subprocess_check_call.assert_called_with(['service', 'synapse', 'restart'])
+
+        expected_calls = [
+            mock.call(['service', 'synapse', 'stop']),
+            mock.call(['service', 'synapse', 'start'])
+        ]
+
+        assert mock_subprocess_check_call.call_args_list == expected_calls
 
 
 def test_synapse_not_restarted_when_config_files_are_identical():

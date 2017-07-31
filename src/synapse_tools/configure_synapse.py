@@ -54,7 +54,7 @@ def set_defaults(config):
         ('maximum_connections', 10000),
         ('maxconn_per_server', 50),
         ('maxqueue_per_server', 10),
-        ('synapse_restart_command', ['service', 'synapse', 'restart']),
+        ('synapse_command', ['service', 'synapse']),
         ('zookeeper_topology_path',
             '/nail/etc/zookeeper_discovery/infrastructure/local.yaml'),
         ('hacheck_port', 6666),
@@ -841,7 +841,17 @@ def main():
         shutil.copy(new_synapse_config_path, my_config['config_file'])
 
         if should_restart:
-            subprocess.check_call(my_config['synapse_restart_command'])
+            # backwards compatibility for synapse_restart_command
+            # Note that it's preferable to use synapse_command
+            if 'synapse_restart_command' in my_config:
+                subprocess.check_call(my_config['synapse_restart_command'])
+            else:
+                # Use stop + start so that we re-read the init file
+                # This is useful, for example, to ensure Synapse has good
+                # limits on file descriptors (which means HAProxy will)
+                cmd = my_config['synapse_command']
+                subprocess.check_call(cmd + ['stop'])
+                subprocess.check_call(cmd + ['start'])
 
 
 if __name__ == '__main__':
