@@ -1,3 +1,9 @@
+synapse-tools (0.13.5) lucid; urgency=low
+
+  * Enable synapse plugins
+
+ -- Joseph Lynch <jlynch@yelp.com>  Mon, 31 Jul 2017 14:57:25 -0700
+
 synapse-tools (0.13.4) lucid; urgency=low
 
   * Use stop + start instead of restart to pick up new init settings
