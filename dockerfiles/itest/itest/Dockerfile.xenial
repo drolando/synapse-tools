@@ -17,12 +17,20 @@ RUN apt-get update && apt-get -y install \
     libxslt-dev \
     build-essential \
     zlib1g-dev \
-    nginx
+    nginx \
+    liblua5.3-dev \
+    libssl-dev
 
-ADD https://github.com/haproxy/haproxy/archive/v1.6.0.tar.gz /haproxy.tar.gz
+# HAProxy configured with Lua scripting
+WORKDIR /
+ADD http://www.haproxy.org/download/1.7/src/haproxy-1.7.8.tar.gz /haproxy.tar.gz
 RUN tar -axvf /haproxy.tar.gz
-WORKDIR /haproxy-1.6.0
-RUN make TARGET=linux26 && mv haproxy /usr/bin/haproxy-synapse
+WORKDIR /haproxy-1.7.8
+RUN make TARGET=linux26 \
+    USE_LUA=1 \
+    LUA_LIB=/usr/lib/x86_64-linux-gnu \
+    LUA_INC=/usr/include/lua5.3 \
+    && mv haproxy /usr/bin/haproxy-synapse
 
 # Pin for test reproducibility
 RUN gem install --no-ri --no-rdoc nokogiri -v 1.6.7.2

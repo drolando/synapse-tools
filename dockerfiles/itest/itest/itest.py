@@ -29,6 +29,18 @@ SERVICES = {
         'advertise': ['habitat', 'region'],
     },
 
+    # HTTP service with a custom endpoint
+    'service_three.logging': {
+        'host': 'servicethree_1',
+        'ip_address': socket.gethostbyname('servicethree_1'),
+        'port': 1024,
+        'proxy_port': 20050,
+        'mode': 'http',
+        'healthcheck_uri': '/my_healthcheck_endpoint',
+        'discover': 'habitat',
+        'advertise': ['habitat'],
+    },
+
     # TCP service
     'service_one.main': {
         'host': 'serviceone_1',
@@ -160,6 +172,10 @@ def _sort_lists_in_dict(d):
     return d
 
 
+def test_haproxy_config_valid(setup):
+    subprocess.check_call(['haproxy-synapse', '-c', '-f', '/var/run/synapse/haproxy.cfg'])
+
+
 def test_haproxy_synapse_reaper(setup):
     # This should run with no errors.  Everything is running as root, so we need
     # to use the --username option here.
@@ -179,6 +195,7 @@ def test_synapse_services(setup):
         'service_one.main',
         'service_three_chaos.main',
         'service_two.main',
+        'service_three.logging',
     ]
 
     with open('/etc/synapse/synapse.conf.json') as fd:
@@ -193,6 +210,7 @@ def test_synapse_services(setup):
             'service_one.main.nginx_listener',
             'service_two.main.nginx_listener',
             'service_three.main.nginx_listener',
+            'service_three.logging.nginx_listener',
         ]
         expected_services.extend(nginx_services)
 
@@ -396,3 +414,45 @@ def test_http_service_returns_503(setup):
         with contextlib.closing(urllib2.urlopen(uri, timeout=SOCKET_TIMEOUT)):
             assert False
         assert excinfo.value.getcode() == 503
+
+def test_logging_plugin(setup):
+    # Test plugins only with HAProxy
+    if 'nginx' not in setup:
+
+        # Send mock requests
+        name = 'service_three.logging'
+        data = SERVICES[name]
+        url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
+        if setup == '/etc/synapse/synapse-tools.conf.json':
+            headers_list = [
+                {'From': 'Reservations'},
+                {'From': 'Search'},
+                {'From': 'Geolocator'}
+            ]
+        elif setup == '/etc/synapse/synapse-tools-both.conf.json':
+            headers_list = [
+                {'From': 'Highlights'},
+                {'From': 'Users'}
+            ]
+
+        for headers in headers_list:
+            request = urllib2.Request(url=url, headers=headers)
+            with contextlib.closing(
+                    urllib2.urlopen(request, timeout=SOCKET_TIMEOUT)) as page:
+                assert page.read().strip() == 'OK'
+
+        # Check that requests were logged
+        log_file = '/var/log/demo_log'
+        try:
+            with open(log_file) as f:
+                logs = f.readlines()
+                n = len(headers_list)
+                assert len(logs) >= n
+
+                logs_tail = logs[-n:]
+                for i in xrange(n):
+                    expected = 'From: %s' % headers_list[i]['From']
+                    assert expected in logs_tail[i]
+
+        except IOError as e:
+            assert False
