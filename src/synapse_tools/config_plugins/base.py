@@ -4,6 +4,11 @@ import abc
 class HAProxyConfigPlugin(object):
     __metaclass__ = abc.ABCMeta
 
+    def __init__(self, service_name, service_info, synapse_tools_config):
+        self.service_name = service_name
+        self.service_info = service_info
+        self.synapse_tools_config = synapse_tools_config
+
     @abc.abstractmethod
     def global_options(self):
         """
