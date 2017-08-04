@@ -2,10 +2,10 @@ import contextlib
 import csv
 import json
 import os
-import socket
 import subprocess
 import time
 import urllib2
+import socket
 
 import kazoo.client
 import pytest
@@ -13,7 +13,6 @@ import pytest
 
 ZOOKEEPER_CONNECT_STRING = "zookeeper_1:2181"
 
-MY_IP_ADDRESS = socket.gethostbyname(socket.gethostname())
 
 # Authoritative data for tests
 SERVICES = {
@@ -415,44 +414,65 @@ def test_http_service_returns_503(setup):
             assert False
         assert excinfo.value.getcode() == 503
 
-def test_logging_plugin(setup):
-    # Test plugins only with HAProxy
-    if 'nginx' not in setup:
 
-        # Send mock requests
+def test_logging_plugin_not_in_map(setup):
+    # Test plugins only with HAProxy
+    if 'nginx' not in setup and 'both' not in setup:
+
+        # Send requests
+        n = 3
         name = 'service_three.logging'
         data = SERVICES[name]
         url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
-        if setup == '/etc/synapse/synapse-tools.conf.json':
-            headers_list = [
-                {'From': 'Reservations'},
-                {'From': 'Search'},
-                {'From': 'Geolocator'}
-            ]
-        elif setup == '/etc/synapse/synapse-tools-both.conf.json':
-            headers_list = [
-                {'From': 'Highlights'},
-                {'From': 'Users'}
-            ]
+        send_requests(urls=[url]*n)
 
-        for headers in headers_list:
-            request = urllib2.Request(url=url, headers=headers)
-            with contextlib.closing(
-                    urllib2.urlopen(request, timeout=SOCKET_TIMEOUT)) as page:
-                assert page.read().strip() == 'OK'
+        # Check logs for requests
+        log_file = '/var/log/log_without_svc'
+        expected_list = ['nil']*n
+        check_plugin_logs(log_file, expected_list)
 
-        # Check that requests were logged
-        log_file = '/var/log/demo_log'
-        try:
-            with open(log_file) as f:
-                logs = f.readlines()
-                n = len(headers_list)
-                assert len(logs) >= n
 
-                logs_tail = logs[-n:]
-                for i in xrange(n):
-                    expected = 'From: %s' % headers_list[i]['From']
-                    assert expected in logs_tail[i]
+def test_logging_plugin_in_map(setup):
+    # Test plugins only with HAProxy
+    if 'nginx' not in setup and 'both' not in setup:
 
-        except IOError as e:
-            assert False
+        # Send requests
+        n = 3
+        name = 'service_three.logging'
+        data = SERVICES[name]
+        url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
+        send_requests(urls=[url]*n)
+
+        # Check logs for requests
+        log_file = '/var/log/log_with_svc'
+        expected_list = ['Test']*n
+        check_plugin_logs(log_file, expected_list)
+
+
+# Helper for sending requests
+def send_requests(urls, headers=None):
+    n = len(urls)
+    for i in xrange(n):
+        url = urls[i]
+        request = urllib2.Request(url=url)
+        with contextlib.closing(
+            urllib2.urlopen(request, timeout=SOCKET_TIMEOUT)) as page:
+            assert page.read().strip() == 'OK'
+
+
+# Helper for checking requests logged by logging plugin
+def check_plugin_logs(log_file, expected_list):
+    try:
+        with open(log_file) as f:
+            logs = f.readlines()
+            n = len(expected_list)
+            assert len(logs) >= n
+            logs_tail = logs[-n:]
+            for i in xrange(n):
+                expected = expected_list[i]
+                tag = 'provenance'
+                assert tag and expected in logs_tail[i]
+
+    except IOError as e:
+        assert False
+
