@@ -83,8 +83,8 @@ ADD ecosystem /nail/etc/ecosystem
 ADD region /nail/etc/region
 ADD itest.py /itest.py
 ADD run_itest.sh /run_itest.sh
-ADD maps/map_with_svc.map /etc/maps/map_with_svc.map
-ADD maps/map_without_svc.map /etc/maps/map_without_svc.map
+ADD maps/ip_to_svc.map /etc/maps/ip_to_svc.map
+ADD rsyslog-configs/49-haproxy.conf /etc/rsyslog.d/49-haproxy.conf
 
 # configure_synapse tries to restart synapse.
 # make it think it succeeded.

@@ -415,38 +415,21 @@ def test_http_service_returns_503(setup):
         assert excinfo.value.getcode() == 503
 
 
-def test_logging_plugin_not_in_map(setup):
-    # Test plugins only with HAProxy
-    if 'nginx' not in setup and 'both' not in setup:
-
-        # Send requests
-        n = 3
-        name = 'service_three.logging'
-        data = SERVICES[name]
-        url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
-        send_requests(urls=[url]*n)
-
-        # Check logs for requests
-        log_file = '/var/log/log_without_svc'
-        expected_list = ['nil']*n
-        check_plugin_logs(log_file, expected_list)
-
-
 def test_logging_plugin_in_map(setup):
-    # Test plugins only with HAProxy
+    # Test plugins with only HAProxy
     if 'nginx' not in setup and 'both' not in setup:
 
-        # Send requests
+        # Send mock requests
         n = 3
         name = 'service_three.logging'
         data = SERVICES[name]
         url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
         send_requests(urls=[url]*n)
 
-        # Check logs for requests
-        log_file = '/var/log/log_with_svc'
-        expected_list = ['Test']*n
-        check_plugin_logs(log_file, expected_list)
+        # Check for requests in log file
+        log_file = '/var/log/haproxy.log'
+        expected = 'provenance Test'
+        check_plugin_logs(log_file, expected)
 
 
 # Helper for sending requests
@@ -461,17 +444,12 @@ def send_requests(urls, headers=None):
 
 
 # Helper for checking requests logged by logging plugin
-def check_plugin_logs(log_file, expected_list):
+def check_plugin_logs(log_file, expected):
     try:
         with open(log_file) as f:
             logs = f.readlines()
-            n = len(expected_list)
-            assert len(logs) >= n
-            logs_tail = logs[-n:]
-            for i in xrange(n):
-                expected = expected_list[i]
-                tag = 'provenance'
-                assert tag and expected in logs_tail[i]
+            matching_logs = filter(lambda x: expected in x, logs)
+            assert len(matching_logs) >= 1
 
     except IOError as e:
         assert False
