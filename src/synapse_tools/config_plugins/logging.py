@@ -8,7 +8,7 @@ class Logging(HAProxyConfigPlugin):
         lua_dir = self.synapse_tools_config['lua_dir']
         lua_file = os.path.join(lua_dir, 'log_requests.lua')
         map_dir = self.synapse_tools_config['map_dir']
-        map_file = os.path.join(map_dir, 'ip_to_svc.map')
+        map_file = os.path.join(map_dir, 'ip_to_service.map')
         return [
             'lua-load %s' % lua_file,
             'setenv map_file %s' % map_file

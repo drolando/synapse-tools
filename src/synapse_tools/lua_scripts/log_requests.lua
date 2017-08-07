@@ -2,6 +2,10 @@
 
 -- Loads map into Lua script
 function load_map(txn)
+  if map ~= nil then
+    return
+  end
+
   local map_file = txn.f:env('map_file')
   txn.Info(txn, 'Mapfile: ' .. map_file)
   map = Map.new(map_file, Map.str)
@@ -12,6 +16,10 @@ core.register_action("load_map", {"tcp-req","http-req"}, load_map)
 
 -- Logs source service of request
 function log_src(txn)
+  if map == nil then
+    return
+  end
+
   local ip = txn.f:src()
   if ip == nil then
      ip = 'nil'

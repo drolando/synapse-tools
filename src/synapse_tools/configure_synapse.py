@@ -60,7 +60,7 @@ def set_defaults(config):
         ('hacheck_port', 6666),
         ('stats_port', 3212),
         ('lua_dir', os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')),
-        ('map_dir', os.path.join(os.path.dirname(synapse_tools.__file__), 'maps')),
+        ('map_dir', '/var/run/synapse/maps/'),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
