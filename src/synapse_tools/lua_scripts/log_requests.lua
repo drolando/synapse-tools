@@ -1,8 +1,16 @@
 -- Log where requests are sent from and to
 
-map_file = '/etc/maps/ip_to_svc.map'
-map = Map.new(map_file, Map.str)
+-- Loads map into Lua script
+function load_map(txn)
+  local map_file = txn.f:env('map_file')
+  txn.Info(txn, 'Mapfile: ' .. map_file)
+  map = Map.new(map_file, Map.str)
+end
 
+core.register_action("load_map", {"tcp-req","http-req"}, load_map)
+
+
+-- Logs source service of request
 function log_src(txn)
   local ip = txn.f:src()
   if ip == nil then

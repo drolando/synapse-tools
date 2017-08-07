@@ -825,7 +825,8 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'bind /var/run/synapse/sockets/proxy_service.prxy accept-proxy',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
-                    'http-request lua.log_src'
+                    'http-request lua.load_map',
+                    'http-request lua.log_src',
                 ],
                 'backend': [
                     'balance roundrobin',
@@ -891,18 +892,20 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
         },
     }
 
-    expected_configuration['haproxy']['global'].extend(
-        ['lua-load /nail/etc/lua_scripts/log_requests.lua']
-    )
+    expected_configuration['haproxy']['global'].extend([
+        'lua-load /nail/etc/lua_scripts/log_requests.lua',
+        'setenv map_file /etc/maps/ip_to_svc.map'
+    ])
 
     # check frontend and backend sections
     assert actual_configuration['services'] == expected_configuration['services']
 
-    # check global section separately because lua-load file path will vary
+    # check global section separately
     actual_global = actual_configuration['haproxy']['global']
     expected_global = expected_configuration['haproxy']['global']
-    assert actual_global[:-1] == expected_global[:-1]
-    assert 'lua-load' and 'log_requests' in actual_global[-1]
+    assert actual_global[:-2] == expected_global[:-2]
+    assert 'lua-load' and 'log_requests' in actual_global[-2]
+    assert 'setenv map_file' in actual_global[-1]
 
 
 def test_generate_configuration_with_multiple_plugins(mock_get_current_location, mock_available_location_types):
@@ -1025,6 +1028,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'reqadd X-Smartstack-Destination:\\ test_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
+                    'http-request lua.load_map',
                     'http-request lua.log_src',
                     'http-request set-var(txn.backend_name) lua.get_backend',
                     'use_backend %[var(txn.backend_name)]'
@@ -1048,6 +1052,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
 
     expected_configuration['haproxy']['global'].extend([
         'lua-load /nail/etc/lua_scripts/log_requests.lua',
+        'setenv map_file /etc/maps/ip_to_svc.map',
         'lua-load /nail/etc/lua_scripts/path_based_routing.lua'
     ])
 
@@ -1057,8 +1062,9 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
     # check global section separately because lua-load file path will vary
     actual_global = actual_configuration['haproxy']['global']
     expected_global = expected_configuration['haproxy']['global']
-    assert actual_global[:-2] == expected_global[:-2]
-    assert 'lua-load' and 'log_requests' in actual_global[-2]
+    assert actual_global[:-3] == expected_global[:-3]
+    assert 'lua-load' and 'log_requests' in actual_global[-3]
+    assert 'setenv map_file' in actual_global[-2]
     assert 'lua-load' and 'path_based_routing' in actual_global[-1]
 
 
