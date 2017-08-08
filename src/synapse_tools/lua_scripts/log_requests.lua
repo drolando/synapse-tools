@@ -1,38 +1,50 @@
 -- Log where requests are sent from and to
 
-LOGFILE_PATH = '/var/log/'
+-- Loads map into Lua script
+function load_map(txn)
+  if map ~= nil then
+    return
+  end
 
+  local map_file = txn.f:env('map_file')
+  txn.Info(txn, 'Mapfile: ' .. map_file)
+  map = Map.new(map_file, Map.str)
+end
+
+core.register_action("load_map", {"tcp-req","http-req"}, load_map)
+
+
+-- Logs source service of request
 function log_src(txn)
-  local ip = "N/A"
-  if txn.f:src() ~= nil then
-     ip = txn.f:src()
+  if map == nil then
+    return
   end
 
-  local from = "N/A"
-  local hdr = txn.http:req_get_headers()
-  if hdr["from"] ~= nil then
-    from = hdr["from"][0]
+  local ip = txn.f:src()
+  if ip == nil then
+     txn.Info(txn, 'Could not find source IP address')
+     ip = 'nil'
+  end
+  txn.Info(txn, 'Source ip: ' .. ip)
+
+  src_svc = map:lookup(ip)
+  if src_svc == nil then
+     txn.Info(txn, 'Could not find source service')
+     src_svc = 'nil'
   end
 
-  local log_text = 'Source: ' .. ip .. ' From: ' .. from .. '\n'
-  txn.Info(txn, log_text)
-
-  local fname = LOGFILE_PATH .. 'demo_log'
-  local log_file = io.open(fname, 'a')
-  log_file:write(log_text)
-  io.close(log_file)
+  txn.Info(txn, 'Source service: ' .. src_svc)
 end
 
 core.register_action("log_src", {"tcp-req","http-req"}, log_src)
 
-function log_dest(txn)
-  local log_text = 'Logging destination'
-  txn.Info(txn, log_text)
 
-  local fname = LOGFILE_PATH .. 'demo_log'
-  local log_file = io.open(fname, 'a')
-  log_file:write(log_text)
-  log_file:close(log_file)
+-- Logs destination service of request
+function log_dest(txn)
+  dest_svc = txn.f:be_name()
+  txn.Info(txn, 'Destination service: ' .. dest_svc)
+  local log_text = 'provenance ' .. src_svc .. ' ' .. dest_svc .. '\n'
+  txn.Info(txn, log_text)
 end
 
 core.register_action("log_dest", {"tcp-req","http-req"}, log_dest)

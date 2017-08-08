@@ -14,5 +14,8 @@ echo "Testing that pyyaml uses optimized cyaml parsers if present"
 echo "Creating directory for unix sockets"
 mkdir -p /var/run/synapse/sockets
 
+echo "Starting rsyslog"
+rsyslogd -f /etc/rsyslog.conf
+
 echo "Full integration test"
 py.test /itest.py

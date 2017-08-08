@@ -6,11 +6,19 @@ class Logging(HAProxyConfigPlugin):
 
     def global_options(self):
         lua_dir = self.synapse_tools_config['lua_dir']
-        file_path = os.path.join(lua_dir, 'log_requests.lua')
-        return ['lua-load %s' % file_path]
+        lua_file = os.path.join(lua_dir, 'log_requests.lua')
+        map_dir = self.synapse_tools_config['map_dir']
+        map_file = os.path.join(map_dir, 'ip_to_service.map')
+        return [
+            'lua-load %s' % lua_file,
+            'setenv map_file %s' % map_file
+        ]
 
     def frontend_options(self):
-        return ['http-request lua.log_src']
+        return [
+            'http-request lua.load_map',
+            'http-request lua.log_src'
+        ]
 
     def backend_options(self):
-        return []
+        return ['http-request lua.log_dest']
