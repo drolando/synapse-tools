@@ -61,6 +61,7 @@ def set_defaults(config):
         ('stats_port', 3212),
         ('lua_dir', os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')),
         ('map_dir', '/var/run/synapse/maps/'),
+        ('logging', True),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
@@ -498,7 +499,7 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             # Add HAProxy options for plugins
             plugins = service_info.get('plugins', {})
             for plugin_name in PLUGIN_MAP:
-                if plugin_name not in plugins:
+                if plugin_name not in plugins and not synapse_tools_config.get(plugin_name):
                     continue
                 plugin_instance = PLUGIN_MAP[plugin_name](
                     service_name,
