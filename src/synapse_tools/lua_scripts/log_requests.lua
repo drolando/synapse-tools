@@ -22,18 +22,29 @@ function log_src(txn)
 
   local ip = txn.f:src()
   if ip == nil then
+     txn.Info(txn, 'Could not find source IP address')
      ip = 'nil'
   end
   txn.Info(txn, 'Source ip: ' .. ip)
 
-  local from = map:lookup(ip)
-  if from == nil then
+  src_svc = map:lookup(ip)
+  if src_svc == nil then
      txn.Info(txn, 'Could not find source service')
-     from = 'nil'
+     src_svc = 'nil'
   end
 
-  local log_text = 'provenance ' .. from .. '\n'
-  txn.Info(txn, log_text)
+  txn.Info(txn, 'Source service: ' .. src_svc)
 end
 
 core.register_action("log_src", {"tcp-req","http-req"}, log_src)
+
+
+-- Logs destination service of request
+function log_dest(txn)
+  dest_svc = txn.f:be_name()
+  txn.Info(txn, 'Destination service: ' .. dest_svc)
+  local log_text = 'provenance ' .. src_svc .. ' ' .. dest_svc .. '\n'
+  txn.Info(txn, log_text)
+end
+
+core.register_action("log_dest", {"tcp-req","http-req"}, log_dest)

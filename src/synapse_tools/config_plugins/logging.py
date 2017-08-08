@@ -21,4 +21,4 @@ class Logging(HAProxyConfigPlugin):
         ]
 
     def backend_options(self):
-        return []
+        return ['http-request lua.log_dest']
