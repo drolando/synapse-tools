@@ -1,3 +1,9 @@
+synapse-tools (0.13.7) lucid; urgency=low
+
+  * Add flag to enable provenance logging plugin (by zareenc)
+
+ -- Jason Perrin <jvperrin@yelp.com>  Tue, 08 Aug 2017 16:57:38 -0700
+
 synapse-tools (0.13.6) lucid; urgency=low
 
   * Add provenance logging with lua (by zareenc)
