@@ -61,7 +61,7 @@ def set_defaults(config):
         ('stats_port', 3212),
         ('lua_dir', os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')),
         ('map_dir', '/var/run/synapse/maps/'),
-        ('logging', True),
+        ('logging', False),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
