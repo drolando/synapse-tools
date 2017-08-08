@@ -415,7 +415,7 @@ def test_http_service_returns_503(setup):
         assert excinfo.value.getcode() == 503
 
 
-def test_logging_plugin_in_map(setup):
+def test_logging_plugin(setup):
     # Test plugins with only HAProxy
     if 'nginx' not in setup and 'both' not in setup:
 
@@ -428,7 +428,7 @@ def test_logging_plugin_in_map(setup):
 
         # Check for requests in log file
         log_file = '/var/log/haproxy.log'
-        expected = 'provenance Test'
+        expected = 'provenance Test service_three.logging'
         check_plugin_logs(log_file, expected)
 
 
