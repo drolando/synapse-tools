@@ -787,7 +787,8 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'discover': 'region',
                     'plugins': {
                         'logging': {
-                            'enabled': True
+                            'enabled': True,
+                            'sample_rate': 0.25
                         }
                     }
                 }
@@ -897,18 +898,20 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
 
     expected_configuration['haproxy']['global'].extend([
         'lua-load /nail/etc/lua_scripts/log_requests.lua',
-        'setenv map_file /etc/maps/ip_to_svc.map'
+        'setenv map_file /etc/maps/ip_to_svc.map',
+        'setenv sample_rate 0.25'
     ])
 
     # check frontend and backend sections
     assert actual_configuration['services'] == expected_configuration['services']
 
-    # check global section separately
+    # check global section separately because file paths will vary
     actual_global = actual_configuration['haproxy']['global']
     expected_global = expected_configuration['haproxy']['global']
-    assert actual_global[:-2] == expected_global[:-2]
-    assert 'lua-load' and 'log_requests' in actual_global[-2]
-    assert 'setenv map_file' in actual_global[-1]
+    assert actual_global[:-3] == expected_global[:-3]
+    assert 'lua-load' and 'log_requests' in actual_global[-3]
+    assert 'setenv map_file' in actual_global[-2]
+    assert 'setenv sample_rate' in actual_global[-1]
 
 
 def test_generate_configuration_with_multiple_plugins(mock_get_current_location, mock_available_location_types):
@@ -1075,7 +1078,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
     # check frontend and backend sections
     assert actual_configuration['services'] == expected_configuration['services']
 
-    # check global section separately because lua-load file path will vary
+    # check global section separately because file paths will vary
     actual_global = actual_configuration['haproxy']['global']
     expected_global = expected_configuration['haproxy']['global']
     assert actual_global[:-3] == expected_global[:-3]
