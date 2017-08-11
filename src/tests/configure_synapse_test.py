@@ -944,7 +944,10 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'proxy_port': 5678,
                     'balance': 'roundrobin',
                     'advertise': ['region'],
-                    'discover': 'region'
+                    'discover': 'region',
+                    'plugins': {
+                        'logging': True
+                    }
                 }
             )
         ]
@@ -981,7 +984,9 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'bind /var/run/synapse/sockets/proxy_service.sock',
                     'bind /var/run/synapse/sockets/proxy_service.prxy accept-proxy',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
-                    'use_backend proxy_service if proxy_service_has_connslots'
+                    'use_backend proxy_service if proxy_service_has_connslots',
+                    'http-request lua.load_map',
+                    'http-request lua.log_src'
                 ],
                 'backend': [
                     'balance roundrobin',
@@ -989,6 +994,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
                     'option httpchk GET /http/proxy_service/0/status',
                     'http-check send-state',
+                    'http-request lua.log_dest'
                 ],
                 'port': '5678',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',

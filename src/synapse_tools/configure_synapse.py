@@ -501,20 +501,22 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             for plugin_name in PLUGIN_MAP:
                 if plugin_name not in plugins and not synapse_tools_config.get(plugin_name):
                     continue
+
                 plugin_instance = PLUGIN_MAP[plugin_name](
                     service_name,
                     service_info,
                     synapse_tools_config
                 )
-                synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                    plugin_instance.frontend_options()
-                )
-                synapse_config['services'][service_name]['haproxy']['backend'].extend(
-                    plugin_instance.backend_options()
-                )
-                synapse_config['haproxy']['global'].extend(
-                    plugin_instance.global_options()
-                )
+                config_to_opts = [
+                    (synapse_config['services'][service_name]['haproxy']['frontend'],
+                     plugin_instance.frontend_options()),
+                    (synapse_config['services'][service_name]['haproxy']['backend'],
+                     plugin_instance.backend_options()),
+                    (synapse_config['haproxy']['global'],
+                     plugin_instance.global_options())
+                ]
+                for (config, opts) in config_to_opts:
+                    config.extend([x for x in opts if x not in config])
 
     return synapse_config
 
