@@ -786,7 +786,9 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'advertise': ['region'],
                     'discover': 'region',
                     'plugins': {
-                        'logging': True
+                        'logging': {
+                            'enabled': True
+                        }
                     }
                 }
             )
@@ -923,8 +925,12 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'timeout_connect_ms': 2000,
                     'timeout_server_ms': 3000,
                     'plugins': {
-                        'path_based_routing': True,
-                        'logging': True
+                        'path_based_routing': {
+                            'enabled': True
+                        },
+                        'logging': {
+                            'enabled': True
+                        }
                     },
                     'extra_headers': {
                         'X-Mode': 'ro'
@@ -946,7 +952,9 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'advertise': ['region'],
                     'discover': 'region',
                     'plugins': {
-                        'logging': True
+                        'logging': {
+                            'enabled': True
+                        }
                     }
                 }
             )

@@ -499,24 +499,27 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             # Add HAProxy options for plugins
             plugins = service_info.get('plugins', {})
             for plugin_name in PLUGIN_MAP:
-                if plugin_name not in plugins and not synapse_tools_config.get(plugin_name):
-                    continue
 
-                plugin_instance = PLUGIN_MAP[plugin_name](
-                    service_name,
-                    service_info,
-                    synapse_tools_config
-                )
-                config_to_opts = [
-                    (synapse_config['services'][service_name]['haproxy']['frontend'],
-                     plugin_instance.frontend_options()),
-                    (synapse_config['services'][service_name]['haproxy']['backend'],
-                     plugin_instance.backend_options()),
-                    (synapse_config['haproxy']['global'],
-                     plugin_instance.global_options())
-                ]
-                for (config, opts) in config_to_opts:
-                    config.extend([x for x in opts if x not in config])
+                # Check if plugin is enabled for this service or if global flag is set
+                if (plugin_name in plugins and plugins[plugin_name]['enabled']) \
+                        or synapse_tools_config.get(plugin_name):
+
+                    plugin_instance = PLUGIN_MAP[plugin_name](
+                        plugins[plugin_name],
+                        service_name,
+                        service_info,
+                        synapse_tools_config
+                    )
+                    config_to_opts = [
+                        (synapse_config['services'][service_name]['haproxy']['frontend'],
+                         plugin_instance.frontend_options()),
+                        (synapse_config['services'][service_name]['haproxy']['backend'],
+                         plugin_instance.backend_options()),
+                        (synapse_config['haproxy']['global'],
+                         plugin_instance.global_options())
+                    ]
+                    for (config, opts) in config_to_opts:
+                        config.extend([x for x in opts if x not in config])
 
     return synapse_config
 

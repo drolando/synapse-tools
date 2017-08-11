@@ -27,4 +27,5 @@ logging:
   advertise:
   - habitat
   plugins:
-    logging: True
+    logging: 
+      enabled: True
