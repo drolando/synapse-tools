@@ -20,7 +20,7 @@ class Logging(HAProxyConfigPlugin):
 
     def frontend_options(self):
         return [
-            'http-request lua.load_map',
+            'http-request lua.init_logging',
             'http-request lua.log_src'
         ]
 

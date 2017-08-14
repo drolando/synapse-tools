@@ -29,3 +29,4 @@ logging:
   plugins:
     logging: 
       enabled: True
+      sample_rate: 1

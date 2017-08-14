@@ -828,7 +828,7 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'bind /var/run/synapse/sockets/proxy_service.prxy accept-proxy',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
-                    'http-request lua.load_map',
+                    'http-request lua.init_logging',
                     'http-request lua.log_src',
                 ],
                 'backend': [
@@ -996,7 +996,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'bind /var/run/synapse/sockets/proxy_service.prxy accept-proxy',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
-                    'http-request lua.load_map',
+                    'http-request lua.init_logging',
                     'http-request lua.log_src'
                 ],
                 'backend': [
@@ -1046,7 +1046,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'reqadd X-Smartstack-Destination:\\ test_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
                     'use_backend test_service if test_service_has_connslots',
-                    'http-request lua.load_map',
+                    'http-request lua.init_logging',
                     'http-request lua.log_src',
                     'http-request set-var(txn.backend_name) lua.get_backend',
                     'use_backend %[var(txn.backend_name)]'
