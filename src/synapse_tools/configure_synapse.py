@@ -61,7 +61,7 @@ def set_defaults(config):
         ('stats_port', 3212),
         ('lua_dir', os.path.join(os.path.dirname(synapse_tools.__file__), 'lua_scripts')),
         ('map_dir', '/var/run/synapse/maps/'),
-        ('logging', False),
+        ('logging', {'enabled': False}),
         # NGINX related options
         ('listen_with_nginx', False),
         ('nginx_path', '/usr/sbin/nginx'),
@@ -501,11 +501,15 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             for plugin_name in PLUGIN_MAP:
 
                 # Check if plugin is enabled for this service or if global flag is set
-                if (plugin_name in plugins and plugins[plugin_name]['enabled']) \
-                        or synapse_tools_config.get(plugin_name):
+                svc_enabled = plugin_name in plugins and plugins[plugin_name]['enabled']
+                global_enabled = synapse_tools_config.get(plugin_name) and \
+                    synapse_tools_config.get(plugin_name)['enabled']
 
+                if svc_enabled or global_enabled:
+                    plugin_opts = plugins[plugin_name] if svc_enabled else \
+                        synapse_tools_config.get(plugin_name)
                     plugin_instance = PLUGIN_MAP[plugin_name](
-                        plugins[plugin_name],
+                        plugin_opts,
                         service_name,
                         service_info,
                         synapse_tools_config
