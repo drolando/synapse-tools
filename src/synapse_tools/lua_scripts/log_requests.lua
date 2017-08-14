@@ -33,7 +33,7 @@ core.register_action("init_logging", {"tcp-req","http-req"}, init_logging)
 function log_src(txn)
 
   -- Don't log if map doesn't exist or sample rate is 0
-  if map == nil or max_count == 0 then
+  if map == nil or (sample and max_count == 0) then
     return
   end
 
@@ -65,9 +65,13 @@ core.register_action("log_src", {"tcp-req","http-req"}, log_src)
 
 -- Logs destination service of request
 function log_dest(txn)
+
+  -- Only log destination when sampling flag is set
   if sample and not log_req then
      return
   end
+
+  -- Get destination service
   dest_svc = txn.f:be_name()
   txn.Info(txn, 'Destination service: ' .. dest_svc)
   local log_text = 'provenance ' .. src_svc .. ' ' .. dest_svc .. '\n'
