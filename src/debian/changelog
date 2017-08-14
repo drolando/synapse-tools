@@ -1,3 +1,9 @@
+synapse-tools (0.13.8) lucid; urgency=low
+
+  * Deduplicate global options from plugins
+
+ -- Joseph Lynch <jlynch@yelp.com>  Mon, 14 Aug 2017 15:28:54 -0700
+
 synapse-tools (0.13.7) lucid; urgency=low
 
   * Add flag to enable provenance logging plugin (by zareenc)
