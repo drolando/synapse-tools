@@ -15,7 +15,7 @@ class Logging(HAProxyConfigPlugin):
         ]
         if 'sample_rate' in self.plugin_opts:
             sample_rate = str(self.plugin_opts['sample_rate'])
-            opts.append('setenv sample_rate %s' % sample_rate)
+            opts.append('setenv sample_rate {0}'.format(sample_rate))
         return opts
 
     def frontend_options(self):

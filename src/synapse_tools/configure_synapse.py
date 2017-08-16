@@ -501,13 +501,14 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             for plugin_name in PLUGIN_MAP:
 
                 # Check if plugin is enabled for this service or if global flag is set
-                svc_enabled = plugin_name in plugins and plugins[plugin_name]['enabled']
-                global_enabled = synapse_tools_config.get(plugin_name) and \
-                    synapse_tools_config.get(plugin_name)['enabled']
+                svc_enabled = plugins.get(plugin_name, {}).get('enabled', False)
+                global_enabled = synapse_tools_config.get(plugin_name, {}).get('enabled', False)
 
                 if svc_enabled or global_enabled:
-                    plugin_opts = plugins[plugin_name] if svc_enabled else \
+                    plugin_opts = (
+                        plugins[plugin_name] if svc_enabled else
                         synapse_tools_config.get(plugin_name)
+                    )
                     plugin_instance = PLUGIN_MAP[plugin_name](
                         plugin_opts,
                         service_name,
