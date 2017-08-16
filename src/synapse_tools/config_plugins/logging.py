@@ -19,10 +19,10 @@ class Logging(HAProxyConfigPlugin):
         return opts
 
     def frontend_options(self):
-        return [
-            'http-request lua.init_logging',
-            'http-request lua.log_src'
-        ]
+        return []
 
     def backend_options(self):
-        return ['http-request lua.log_dest']
+        return [
+            'http-request lua.init_logging',
+            'http-request lua.log_provenance'
+        ]
