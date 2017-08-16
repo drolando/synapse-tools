@@ -16,9 +16,9 @@ from environment_tools.type_utils import available_location_types
 from environment_tools.type_utils import compare_types
 from environment_tools.type_utils import get_current_location
 from paasta_tools.marathon_tools import get_all_namespaces
+from synapse_tools.config_plugins.registry import PLUGIN_REGISTRY
 from synapse_tools.haproxy_synapse_reaper import DEFAULT_REAP_AGE_S
 from yaml import CLoader
-from synapse_tools.config_plugins.map import PLUGIN_MAP
 
 
 def get_config(synapse_tools_config_path):
@@ -315,33 +315,8 @@ def _get_socket_path(synapse_tools_config, service_name, proxy_proto=False):
     return socket_path
 
 
-def generate_acls_for_service(
-        service_name,
-        discover_type,
-        advertise_types,
-        proxied_through,
-        healthcheck_uri):
+def generate_acls_for_service(service_name, discover_type, advertise_types):
     frontend_acl_configs = []
-
-    # check for proxied_through first, use_backend ordering matters
-    if proxied_through:
-        frontend_acl_configs.extend([
-            'acl is_status_request path {healthcheck_uri}'.format(
-                healthcheck_uri=healthcheck_uri,
-            ),
-            'acl request_from_proxy hdr_beg(X-Smartstack-Source) -i {proxied_through}'.format(
-                proxied_through=proxied_through,
-            ),
-            'acl proxied_through_backend_has_connslots connslots({proxied_through}) gt 0'.format(
-                proxied_through=proxied_through,
-            ),
-            'use_backend {proxied_through} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
-                proxied_through=proxied_through,
-            ),
-            'reqadd X-Smartstack-Destination:\ {service_name} if !is_status_request !request_from_proxy proxied_through_backend_has_connslots'.format(
-                service_name=service_name,
-            ),
-        ])
 
     for advertise_type in advertise_types:
         if compare_types(discover_type, advertise_type) < 0:
@@ -376,11 +351,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
         for depth, loc in enumerate(available_locations)
     }
     available_locations = set(available_locations)
-    proxies = [
-        service_info['proxied_through']
-        for _, service_info in services
-        if service_info.get('proxied_through') is not None
-    ]
 
     for (service_name, service_info) in services:
         proxy_port = service_info.get('proxy_port', -1)
@@ -411,7 +381,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             service_info=service_info,
             zookeeper_topology=zookeeper_topology,
             synapse_tools_config=synapse_tools_config,
-            is_proxy=service_name in proxies,
         )
 
         socket_path = _get_socket_path(
@@ -471,20 +440,6 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
             synapse_config['services'][backend_identifier] = config
 
         if proxy_port is not None:
-            proxied_through = service_info.get('proxied_through')
-            healthcheck_uri = service_info.get('healthcheck_uri', '/status')
-
-            # populate the ACLs to route to the service backends
-            synapse_config['services'][service_name]['haproxy']['frontend'].extend(
-                generate_acls_for_service(
-                    service_name=service_name,
-                    discover_type=discover_type,
-                    advertise_types=advertise_types,
-                    proxied_through=proxied_through,
-                    healthcheck_uri=healthcheck_uri,
-                )
-            )
-
             # If nginx is supported, include a single additional static
             # service watcher per service that listens on the right port and
             # proxies back to the unix socket exposed by HAProxy
@@ -497,12 +452,8 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 )
 
             # Add HAProxy options for plugins
-            plugins = service_info.get('plugins', {})
-            for plugin_name in PLUGIN_MAP:
-                if plugin_name not in plugins and not synapse_tools_config.get(plugin_name):
-                    continue
-
-                plugin_instance = PLUGIN_MAP[plugin_name](
+            for plugin_name in PLUGIN_REGISTRY:
+                plugin_instance = PLUGIN_REGISTRY[plugin_name](
                     service_name,
                     service_info,
                     synapse_tools_config
@@ -518,10 +469,21 @@ def generate_configuration(synapse_tools_config, zookeeper_topology, services):
                 for (config, opts) in config_to_opts:
                     config.extend([x for x in opts if x not in config])
 
+            # TODO(jlynch|2017-08-15): move this to a plugin!
+            # populate the ACLs to route to the service backends, this must
+            # happen last because ordering of use_backend ACLs matters.
+            synapse_config['services'][service_name]['haproxy']['frontend'].extend(
+                generate_acls_for_service(
+                    service_name=service_name,
+                    discover_type=discover_type,
+                    advertise_types=advertise_types,
+                )
+            )
+
     return synapse_config
 
 
-def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config, is_proxy):
+def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology, synapse_tools_config):
     discovery = {
         'method': 'zookeeper',
         'path': '/smartstack/global/%s' % service_name,
@@ -529,7 +491,7 @@ def base_watcher_cfg_for_service(service_name, service_info, zookeeper_topology,
     }
 
     haproxy = _generate_haproxy_for_watcher(
-        service_name, service_info, synapse_tools_config, is_proxy
+        service_name, service_info, synapse_tools_config
     )
 
     chaos = service_info.get('chaos')
@@ -566,7 +528,7 @@ def _generate_captured_request_headers(synapse_tools_config):
     return headers
 
 
-def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config, is_proxy):
+def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_config):
     # Note that validations of all the following config options are done in
     # config post-receive so invalid config should never get here
 
@@ -626,18 +588,6 @@ def _generate_haproxy_for_watcher(service_name, service_info, synapse_tools_conf
         # We need to put the frontend and backend into tcp mode
         frontend_options.append('mode tcp')
         backend_options.append('mode tcp')
-
-    if is_proxy:
-        backend_options.extend(
-            [
-                'acl is_status_request path {healthcheck_uri}'.format(
-                    healthcheck_uri=service_info.get('healthcheck_uri', '/status'),
-                ),
-                'reqadd X-Smartstack-Source:\ {service_name} if !is_status_request'.format(
-                    service_name=service_name,
-                ),
-            ]
-        )
 
     extra_headers = service_info.get('extra_headers', {})
     for header, value in extra_headers.iteritems():
