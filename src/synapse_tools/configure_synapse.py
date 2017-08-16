@@ -834,7 +834,7 @@ def main():
             json.dump(new_synapse_config, fp, sort_keys=True, indent=4, separators=(',', ': '))
 
         # Match permissions that puppet expects
-        os.chmod(new_synapse_config_path, 0644)
+        os.chmod(new_synapse_config_path, 0o644)
 
         # Restart synapse if the config files differ
         should_restart = not filecmp.cmp(new_synapse_config_path, my_config['config_file'])
