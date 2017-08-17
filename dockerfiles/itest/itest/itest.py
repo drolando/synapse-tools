@@ -420,11 +420,10 @@ def test_logging_plugin(setup):
     if 'nginx' not in setup and 'both' not in setup:
 
         # Send mock requests
-        n = 3
         name = 'service_three.logging'
         data = SERVICES[name]
         url = 'http://localhost:%d%s' % (data['proxy_port'], data['healthcheck_uri'])
-        send_requests(urls=[url]*n)
+        send_requests(urls=[url])
 
         # Check for requests in log file
         log_file = '/var/log/haproxy.log'
@@ -434,9 +433,7 @@ def test_logging_plugin(setup):
 
 # Helper for sending requests
 def send_requests(urls, headers=None):
-    n = len(urls)
-    for i in xrange(n):
-        url = urls[i]
+    for url in urls:
         request = urllib2.Request(url=url)
         with contextlib.closing(
             urllib2.urlopen(request, timeout=SOCKET_TIMEOUT)) as page:

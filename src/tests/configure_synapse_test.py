@@ -788,7 +788,10 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'discover': 'region',
                     'is_proxy': True,
                     'plugins': {
-                        'logging': True
+                        'logging': {
+                            'enabled': True,
+                            'sample_rate': 0.25
+                        }
                     }
                 }
             )
@@ -825,8 +828,6 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'option httplog',
                     'bind /var/run/synapse/sockets/proxy_service.sock',
                     'bind /var/run/synapse/sockets/proxy_service.prxy accept-proxy',
-                    'http-request lua.load_map',
-                    'http-request lua.log_src',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
                 ],
@@ -836,7 +837,8 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
                     'http-check send-state',
                     'acl is_status_request path /status',
                     'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
-                    'http-request lua.log_dest',
+                    'http-request lua.init_logging',
+                    'http-request lua.log_provenance',
                 ],
                 'port': '5678',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -897,18 +899,20 @@ def test_generate_configuration_with_logging_plugin(mock_get_current_location, m
 
     expected_configuration['haproxy']['global'].extend([
         'lua-load /nail/etc/lua_scripts/log_requests.lua',
-        'setenv map_file /etc/maps/ip_to_svc.map'
+        'setenv map_file /etc/maps/ip_to_svc.map',
+        'setenv sample_rate 0.25'
     ])
 
     # check frontend and backend sections
     assert actual_configuration['services'] == expected_configuration['services']
 
-    # check global section separately
+    # check global section separately because file paths will vary
     actual_global = actual_configuration['haproxy']['global']
     expected_global = expected_configuration['haproxy']['global']
-    assert actual_global[:-2] == expected_global[:-2]
-    assert 'lua-load' and 'log_requests' in actual_global[-2]
-    assert 'setenv map_file' in actual_global[-1]
+    assert actual_global[:-3] == expected_global[:-3]
+    assert 'lua-load' and 'log_requests' in actual_global[-3]
+    assert 'setenv map_file' in actual_global[-2]
+    assert 'setenv sample_rate' in actual_global[-1]
 
 
 def test_generate_configuration_with_multiple_plugins(mock_get_current_location, mock_available_location_types):
@@ -925,8 +929,12 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'timeout_connect_ms': 2000,
                     'timeout_server_ms': 3000,
                     'plugins': {
-                        'path_based_routing': True,
-                        'logging': True
+                        'path_based_routing': {
+                            'enabled': True
+                        },
+                        'logging': {
+                            'enabled': True
+                        }
                     },
                     'extra_headers': {
                         'X-Mode': 'ro'
@@ -949,7 +957,9 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'discover': 'region',
                     'is_proxy': True,
                     'plugins': {
-                        'logging': True
+                        'logging': {
+                            'enabled': True
+                        }
                     }
                 }
             )
@@ -986,8 +996,6 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'option httplog',
                     'bind /var/run/synapse/sockets/proxy_service.sock',
                     'bind /var/run/synapse/sockets/proxy_service.prxy accept-proxy',
-                    'http-request lua.load_map',
-                    'http-request lua.log_src',
                     'acl proxy_service_has_connslots connslots(proxy_service) gt 0',
                     'use_backend proxy_service if proxy_service_has_connslots',
                 ],
@@ -997,7 +1005,8 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'http-check send-state',
                     'acl is_status_request path /status',
                     'reqadd X-Smartstack-Source:\\ proxy_service if !is_status_request',
-                    'http-request lua.log_dest'
+                    'http-request lua.init_logging',
+                    'http-request lua.log_provenance',
                 ],
                 'port': '5678',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -1036,8 +1045,6 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'acl proxied_through_backend_has_connslots connslots(proxy_service) gt 0',
                     'reqadd X-Smartstack-Destination:\\ test_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
                     'use_backend proxy_service if !is_status_request !request_from_proxy proxied_through_backend_has_connslots',
-                    'http-request lua.load_map',
-                    'http-request lua.log_src',
                     'http-request set-var(txn.backend_name) lua.get_backend',
                     'use_backend %[var(txn.backend_name)]',
                     'acl test_service_has_connslots connslots(test_service) gt 0',
@@ -1052,7 +1059,8 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
                     'retries 2',
                     'timeout connect 2000ms',
                     'timeout server 3000ms',
-                    'http-request lua.log_dest',
+                    'http-request lua.init_logging',
+                    'http-request lua.log_provenance',
                 ],
                 'port': '1234',
                 'server_options': 'check port 6666 observe layer7 maxconn 50 maxqueue 10',
@@ -1070,7 +1078,7 @@ def test_generate_configuration_with_multiple_plugins(mock_get_current_location,
     # check frontend and backend sections
     assert actual_configuration['services'] == expected_configuration['services']
 
-    # check global section separately because lua-load file path will vary
+    # check global section separately because file paths will vary
     actual_global = actual_configuration['haproxy']['global']
     expected_global = expected_configuration['haproxy']['global']
     assert actual_global[:-3] == expected_global[:-3]

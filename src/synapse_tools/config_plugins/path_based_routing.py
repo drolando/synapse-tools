@@ -7,9 +7,9 @@ class PathBasedRouting(HAProxyConfigPlugin):
         super(PathBasedRouting, self).__init__(
             service_name, service_info, synapse_tools_config
         )
-        global_enabled = synapse_tools_config.get('path_based_routing', False)
-        svc_enabled = service_info.get('plugins', {}).get('path_based_routing', False)
 
+        global_enabled = self.synapse_tools_config.get('path_based_routing', {}).get('enabled', False)
+        svc_enabled = self.plugins.get('path_based_routing', {}).get('enabled', False)
         self.enabled = svc_enabled or global_enabled
 
     def global_options(self):
