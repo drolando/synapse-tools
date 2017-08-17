@@ -1,3 +1,10 @@
+synapse-tools (0.13.11) lucid; urgency=low
+
+  * Sampling provenance plugin
+  * Provenance plugin now takes options in config
+
+ -- Joseph Lynch <jlynch@yelp.com>  Wed, 16 Aug 2017 17:59:14 -0700
+
 synapse-tools (0.13.10) lucid; urgency=low
 
   * Depend on socat so restarts work
