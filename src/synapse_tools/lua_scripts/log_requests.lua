@@ -1,7 +1,5 @@
 -- Log where requests are sent from and to
-count = 0
-max_count = 0
-sample = false
+sample_rate = 0
 
 -- Loads map into Lua script and sets sample rate
 function init_logging(txn)
@@ -13,15 +11,10 @@ function init_logging(txn)
   end
 
   -- Set sample rate
-  local sample_rate = txn.f:env('sample_rate')
-  if sample_rate ~= nil and not sample then
-    sample = true
-    if tonumber(sample_rate) > 0 then
-      max_count = math.floor(1./tonumber(sample_rate))
-    else
-      max_count = 0
-    end
-    count = 0
+  if txn.f:env('sample_rate') ~= nil then
+     sample_rate = tonumber(txn.f:env('sample_rate'))
+  else
+     sample_rate = 1
   end
 end
 
@@ -31,20 +24,9 @@ core.register_action("init_logging", {"tcp-req","http-req"}, init_logging)
 -- Logs source and destination service of request
 function log_provenance(txn)
 
-  -- Don't log if map doesn't exist or sample rate is 0
-  if map == nil or (sample and max_count == 0) then
+  -- Don't log if map doesn't exist or sampled out
+  if (map == nil) or (sample_rate == 0) or (math.random() > sample_rate) then
     return
-  end
-
-  -- Sampling
-  if sample then
-     count = count + 1
-     if count < max_count then
-        return
-     else
-        count = 0
-        log_req = true
-     end
   end
 
   -- Get source service
@@ -56,11 +38,9 @@ function log_provenance(txn)
   if src_svc == nil then
      src_svc = ip
   end
-  txn.Info(txn, 'Source service: ' .. src_svc)
 
   -- Get destination service
   dest_svc = txn.f:be_name()
-  txn.Info(txn, 'Destination service: ' .. dest_svc)
   local log_text = 'provenance ' .. src_svc .. ' ' .. dest_svc .. '\n'
   txn.Info(txn, log_text)
 end
